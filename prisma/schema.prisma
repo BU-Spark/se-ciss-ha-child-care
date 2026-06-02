@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PROVIDER
+  CCRR_STAFF
+  EEC_ADMIN
+}
+
+enum SessionFormat {
+  VIRTUAL
+  IN_PERSON
+}
+
+enum SessionStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+enum ProviderType {
+  CENTER_BASED
+  FAMILY_CHILD_CARE
+  SCHOOL_AGE
+  OTHER
+  UNKNOWN
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  ATTENDED
+  NO_SHOW
+  CANCELLED
+  WAITLISTED
+}
+
+enum AttendanceStatus {
+  NOT_MARKED
+  ATTENDED
+  NO_SHOW
+}
+
+model Agency {
+  id        String   @id @default(cuid())
+  name      String
+  region    String
+  email     String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appUsers AppUser[] @relation("AppUserAgency")
+  staff    StaffUser[]
+  sessions OrientationSession[]
+
+  @@unique([name, region])
+  @@map("CcrrAgency")
+}
+
+model AppUser {
+  id          String       @id @default(cuid())
+  clerkUserId String       @unique
+  email       String       @unique
+  firstName   String?
+  lastName    String?
+  role        UserRole     @default(PROVIDER)
+  agencyId    String?
+  agency      Agency?      @relation("AppUserAgency", fields: [agencyId], references: [id], onDelete: SetNull)
+
+  providerName         String?
+  organizationName     String?
+  phone                String?
+  providerType         ProviderType @default(UNKNOWN)
+  stateProviderId      String?
+  preferredLanguage    String       @default("en")
+  accessibilityNeeds   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  registrations Registration[]
+
+  @@index([agencyId])
+  @@index([role])
+  @@map("AppUser")
+}
+
+model StaffUser {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  role        UserRole
+  agencyId    String?
+  agency      Agency?  @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  clerkUserId String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([role])
+  @@map("StaffUser")
+}
+
+model OrientationSession {
+  id           String        @id @default(cuid())
+  agencyId     String
+  agency       Agency        @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  title        String
+  description  String?
+  region       String
+  format       SessionFormat @default(VIRTUAL)
+  status       SessionStatus @default(PUBLISHED)
+  startsAt     DateTime      @map("startAt")
+  endsAt       DateTime      @map("endAt")
+  capacity     Int?          @default(25) @map("maxCapacity")
+  locationName String?       @map("location")
+  address      String?
+  meetingUrl   String?       @map("zoomLink")
+  meetingId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  registrations Registration[]
+
+  @@index([agencyId])
+  @@index([region])
+  @@index([startsAt])
+  @@index([format])
+  @@map("OrientationSession")
+}
+
+model Registration {
+  id        String             @id @default(cuid())
+  sessionId String
+  session   OrientationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      AppUser?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  providerName     String
+  organizationName String           @map("organization")
+  contactEmail     String           @map("email")
+  phone            String?
+  providerType     String?
+  status           RegistrationStatus @default(REGISTERED)
+  attendanceStatus AttendanceStatus   @default(NOT_MARKED)
+  completedAt      DateTime?
+  checkedInAt      DateTime?
+  followUpSentAt   DateTime?
+  reminderSentAt   DateTime?
+  notes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([attendanceStatus])
+  @@map("Registration")
+}
