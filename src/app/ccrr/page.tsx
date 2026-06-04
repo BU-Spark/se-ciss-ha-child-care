@@ -38,6 +38,7 @@ function NavBar() {
 }
 
 function SessionCard({ session }: { session: StaffSession }) {
+  const router = useRouter();
   const pct = (session.registered / session.capacity) * 100;
   const isNearFull = pct >= 90;
   return (
@@ -59,8 +60,9 @@ function SessionCard({ session }: { session: StaffSession }) {
           <div className={`h-full rounded-full ${isNearFull ? "bg-red-500" : "bg-[#1a2f5e]"}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
-      <button className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors flex items-center justify-center gap-2">
-        Manage Attendance →
+      <button onClick={() => router.push(`/ccrr/sessions/${session.id}`)}
+      className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors flex items-center justify-center gap-2">
+      Manage Attendance →
       </button>
     </div>
   );
