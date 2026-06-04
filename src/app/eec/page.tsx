@@ -6,6 +6,7 @@ import { useAuth, UserButton } from "@clerk/nextjs";
 
 type Registration = { id: string; providerName: string; agency: string; region: string; sessionDate: string; format: string; status: "Attended" | "Registered" | "No-show"; };
 
+// TODO: replace with GET /api/eec/registrations?agency=&region=&date=&providerType=
 const REGISTRATIONS: Registration[] = [
   { id: "1", providerName: "Sarah Jenkins", agency: "Child Care Choices", region: "Metro Boston", sessionDate: "Oct 24, 2024", format: "Virtual", status: "Attended" },
   { id: "2", providerName: "Bright Horizons #42", agency: "Seven Hills", region: "Central", sessionDate: "Oct 26, 2024", format: "In-person", status: "Registered" },
@@ -13,6 +14,8 @@ const REGISTRATIONS: Registration[] = [
   { id: "4", providerName: "Little Explorers Daycare", agency: "Pace CC", region: "Southeast", sessionDate: "Oct 28, 2024", format: "In-person", status: "Registered" },
   { id: "5", providerName: "David Thompson", agency: "Valley Opp Inc", region: "Western", sessionDate: "Oct 21, 2024", format: "Virtual", status: "Attended" },
 ];
+
+// TODO: replace with GET /api/eec/analytics/regional-completion
 const REGIONAL_RATES = [{ region: "Metro Boston", rate: 94 }, { region: "Central", rate: 89 }, { region: "Northeast", rate: 91 }, { region: "Western", rate: 85 }, { region: "Southeast", rate: 88 }];
 const NAV_ITEMS = ["Overview", "Registration Data", "Regional Analytics", "Agency Compliance", "Audit Logs"];
 const AGENCIES = ["All Agencies", "Child Care Choices", "Seven Hills", "Child Care Circuit", "Pace CC", "Valley Opp Inc"];
@@ -76,6 +79,7 @@ export default function EecPage() {
         </aside>
         <main className="flex-1 px-6 py-6 flex flex-col gap-6 overflow-auto">
           <h1 className="text-xl font-bold text-[#1a2f5e]">EEC Orientation – Administrator</h1>
+          {/* TODO: replace with GET /api/eec/stats (total registrations, completions, active sessions, agencies) */}
           <div className="grid grid-cols-4 gap-4">
             {[{ label: "TOTAL REGISTRATIONS", value: "4,280", sub: "↗12%" }, { label: "TOTAL COMPLETIONS", value: "3,912", sub: "91.4% Rate" }, { label: "ACTIVE SESSIONS", value: "18", sub: "Across 6 Regions" }, { label: "CCR&R AGENCIES", value: "6", sub: "Active Network" }].map((stat) => (
               <div key={stat.label} className="bg-white border border-zinc-200 rounded-lg p-4">
@@ -100,7 +104,23 @@ export default function EecPage() {
               <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100">
                   <p className="text-sm font-semibold text-zinc-800">Recent Provider Registrations</p>
-                  <button className="text-xs font-medium text-zinc-600 border border-zinc-200 px-3 py-1.5 rounded-md hover:bg-zinc-50">↓ Export CSV</button>
+                  <button
+                  onClick={() => {
+                    const headers = ["Provider Name", "Agency", "Region", "Session Date", "Format", "Status"];
+                    const rows = REGISTRATIONS.map(r => [r.providerName, r.agency, r.region, `"${r.sessionDate}"`, r.format, r.status]);
+                    const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
+                    const blob = new Blob([csv], { type: "text/csv" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "eec-registrations.csv";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-xs font-medium text-zinc-600 border border-zinc-200 px-3 py-1.5 rounded-md hover:bg-zinc-50"
+                >
+                  ↓ Export CSV
+                </button>
                 </div>
                 <table className="w-full text-sm">
                   <thead>
