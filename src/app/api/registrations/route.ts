@@ -66,6 +66,14 @@ export async function POST(request: Request) {
         );
       }
 
+      const existingStaffProfile = await tx.staffUser.findUnique({
+        where: { clerkUserId: userId },
+      });
+
+      if (existingStaffProfile) {
+        throw ApiError.forbidden("Staff accounts cannot register as providers");
+      }
+
       const appUser = await tx.appUser.upsert({
         where: { clerkUserId: userId },
         update: {
