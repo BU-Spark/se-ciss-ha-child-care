@@ -28,21 +28,26 @@ type SessionDetail = {
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 // TODO: replace with GET /api/ccrr/sessions/[id]/registrations
 
-const MOCK_SESSION: SessionDetail = {
-  id: "1",
-  title: "EEC Orientation – CCR&R Staff",
-  date: "October 24, 2024",
-  time: "10:00 AM - 12:00 PM",
-  format: "Virtual (Zoom)",
-  facilitator: "Sarah Mitchell",
-  totalRegistered: 24,
+const MOCK_SESSIONS: Record<string, SessionDetail> = {
+  "44219": { id: "44219", title: "EEC Orientation – CCR&R Staff", date: "June 14, 2024", time: "10:00 AM - 12:30 PM", format: "Virtual (Zoom)", facilitator: "Sarah Mitchell", totalRegistered: 3 },
+  "44225": { id: "44225", title: "EEC Orientation – CCR&R Staff", date: "June 21, 2024", time: "1:00 PM - 3:30 PM", format: "In-person", facilitator: "Sarah Mitchell", totalRegistered: 2 },
+  "44231": { id: "44231", title: "EEC Orientation – CCR&R Staff", date: "June 28, 2024", time: "9:00 AM - 11:30 AM", format: "Virtual (Zoom)", facilitator: "Sarah Mitchell", totalRegistered: 1 },
 };
 
-const MOCK_PROVIDERS: Provider[] = [
-  { id: "1", name: "Maria Rodriguez", email: "m.rodriguez@example.com", registrationDate: "Oct 12, 2024", attended: false, notes: "" },
-  { id: "2", name: "James Chen", email: "j.chen@daycare.org", registrationDate: "Oct 14, 2024", attended: true, notes: "Arrived 5 mins late" },
-  { id: "3", name: "Althea Jenkins", email: "ajenkins@provider.net", registrationDate: "Oct 15, 2024", attended: false, notes: "" },
-];
+const MOCK_PROVIDERS_BY_SESSION: Record<string, Provider[]> = {
+  "44219": [
+    { id: "1", name: "Maria Rodriguez", email: "m.rodriguez@example.com", registrationDate: "Jun 2, 2024", attended: false, notes: "" },
+    { id: "2", name: "James Chen", email: "j.chen@daycare.org", registrationDate: "Jun 4, 2024", attended: true, notes: "Arrived 5 mins late" },
+    { id: "3", name: "Althea Jenkins", email: "ajenkins@provider.net", registrationDate: "Jun 5, 2024", attended: false, notes: "" },
+  ],
+  "44225": [
+    { id: "4", name: "Devon Walsh", email: "d.walsh@brightstart.org", registrationDate: "Jun 9, 2024", attended: false, notes: "" },
+    { id: "5", name: "Priya Nair", email: "priya.nair@example.com", registrationDate: "Jun 11, 2024", attended: false, notes: "" },
+  ],
+  "44231": [
+    { id: "6", name: "Tomás Herrera", email: "t.herrera@littlesteps.org", registrationDate: "Jun 18, 2024", attended: false, notes: "" },
+  ],
+};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -79,8 +84,13 @@ export default function SessionDetailPage() {
   const params = useParams();
   const sessionId = params.id as string;
 
-  const [session] = useState<SessionDetail>(MOCK_SESSION);
-  const [providers, setProviders] = useState<Provider[]>(MOCK_PROVIDERS);
+  // Derived, not state — recomputes when the route param changes.
+  const session = MOCK_SESSIONS[sessionId] ?? null;
+
+  // Stays as state because attendance toggles/notes mutate it.
+  const [providers, setProviders] = useState<Provider[]>(
+    MOCK_PROVIDERS_BY_SESSION[sessionId] ?? []
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -89,11 +99,22 @@ export default function SessionDetailPage() {
     if (isLoaded && !userId) router.push("/sign-in");
   }, [isLoaded, userId, router]);
 
+  // Redirect to dashboard if the session id doesn't exist (only once auth is settled)
+  useEffect(() => {
+    if (isLoaded && userId && !session) router.replace("/ccrr");
+  }, [isLoaded, userId, session, router]);
+
+  // Reset provider state when navigating between sessions (component may be reused)
+  useEffect(() => {
+    setProviders(MOCK_PROVIDERS_BY_SESSION[sessionId] ?? []);
+    setSaved(false);
+  }, [sessionId]);
+
   // TODO: fetch real session + registrations
   // useEffect(() => {
   //   fetch(`/api/ccrr/sessions/${sessionId}/registrations`)
   //     .then(r => r.json())
-  //     .then(json => { setSession(json.data.session); setProviders(json.data.registrations); });
+  //     .then(json => { setProviders(json.data.registrations); });
   // }, [sessionId]);
 
   function toggleAttended(id: string) {
@@ -119,6 +140,7 @@ export default function SessionDetailPage() {
   }
 
   if (!isLoaded || !userId) return null;
+  if (!session) return null; // redirect effect handles navigation
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
