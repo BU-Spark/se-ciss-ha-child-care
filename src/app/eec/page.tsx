@@ -106,16 +106,27 @@ export default function EecPage() {
                   <p className="text-sm font-semibold text-zinc-800">Recent Provider Registrations</p>
                   <button
                   onClick={() => {
+                    const escapeCSV = (val: string) => {
+                      const s = /^[=+\-@]/.test(val) ? `'${val}` : val;
+                      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+                    };
                     const headers = ["Provider Name", "Agency", "Region", "Session Date", "Format", "Status"];
-                    const rows = REGISTRATIONS.map(r => [r.providerName, r.agency, r.region, `"${r.sessionDate}"`, r.format, r.status]);
+                    const rows = REGISTRATIONS.map(r => [
+                      escapeCSV(r.providerName),
+                      escapeCSV(r.agency),
+                      escapeCSV(r.region),
+                      escapeCSV(r.sessionDate),
+                      escapeCSV(r.format),
+                      escapeCSV(r.status),
+                    ]);
                     const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
-                    const blob = new Blob([csv], { type: "text/csv" });
+                    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = url;
                     a.download = "eec-registrations.csv";
                     a.click();
-                    URL.revokeObjectURL(url);
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
                   }}
                   className="text-xs font-medium text-zinc-600 border border-zinc-200 px-3 py-1.5 rounded-md hover:bg-zinc-50"
                 >
