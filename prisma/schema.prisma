@@ -138,6 +138,26 @@ model OrientationSession {
   @@map("OrientationSession")
 }
 
+model ProviderProgram {
+  id              String       @id @default(cuid())
+  stateProviderId String       @unique
+  programName     String
+  providerType    ProviderType
+  address         String
+  city            String
+  region          String
+  licensingRegion String
+  subsidyRegion   String
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([programName])
+  @@index([city])
+  @@index([region])
+  @@map("ProviderProgram")
+}
+
 model Registration {
   id        String             @id @default(cuid())
   sessionId String

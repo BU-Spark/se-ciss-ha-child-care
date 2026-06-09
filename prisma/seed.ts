@@ -1,4 +1,9 @@
-import { PrismaClient, SessionFormat, SessionStatus } from "@prisma/client";
+import {
+  PrismaClient,
+  ProviderType,
+  SessionFormat,
+  SessionStatus,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -48,6 +53,97 @@ const sessions = [
   },
 ];
 
+const providerPrograms = [
+  {
+    id: "program-little-learners",
+    stateProviderId: "PID-100112",
+    programName: "Little Learners Child Care Center",
+    providerType: ProviderType.CENTER_BASED,
+    address: "18 Beacon St, Boston, MA 02108",
+    city: "Boston",
+    region: "Boston",
+    licensingRegion: "Metro Boston",
+    subsidyRegion: "Metro Boston",
+  },
+  {
+    id: "program-bright-futures",
+    stateProviderId: "PID-100214",
+    programName: "Bright Futures Family Child Care",
+    providerType: ProviderType.FAMILY_CHILD_CARE,
+    address: "42 Main St, Worcester, MA 01608",
+    city: "Worcester",
+    region: "Central",
+    licensingRegion: "Central",
+    subsidyRegion: "Central",
+  },
+  {
+    id: "program-rising-stars",
+    stateProviderId: "PID-100318",
+    programName: "Rising Stars Early Learning",
+    providerType: ProviderType.CENTER_BASED,
+    address: "240 River St, Springfield, MA 01103",
+    city: "Springfield",
+    region: "Western",
+    licensingRegion: "Western",
+    subsidyRegion: "Western",
+  },
+  {
+    id: "program-harbor-view",
+    stateProviderId: "PID-100427",
+    programName: "Harbor View Kids Academy",
+    providerType: ProviderType.CENTER_BASED,
+    address: "88 Harbor St, New Bedford, MA 02740",
+    city: "New Bedford",
+    region: "Southeast",
+    licensingRegion: "Southeast",
+    subsidyRegion: "Southeast",
+  },
+  {
+    id: "program-northeast-neighborhood",
+    stateProviderId: "PID-100533",
+    programName: "Northeast Neighborhood Child Care",
+    providerType: ProviderType.CENTER_BASED,
+    address: "12 Essex St, Lawrence, MA 01840",
+    city: "Lawrence",
+    region: "Northeast",
+    licensingRegion: "Northeast",
+    subsidyRegion: "Northeast",
+  },
+  {
+    id: "program-tiny-explorers",
+    stateProviderId: "PID-100641",
+    programName: "Tiny Explorers Family Child Care",
+    providerType: ProviderType.FAMILY_CHILD_CARE,
+    address: "17 Maple Ave, Cambridge, MA 02139",
+    city: "Cambridge",
+    region: "Metro Boston",
+    licensingRegion: "Metro Boston",
+    subsidyRegion: "Metro Boston",
+  },
+  {
+    id: "program-boston-school-age",
+    stateProviderId: "PID-100755",
+    programName: "Boston Community School-Age Program",
+    providerType: ProviderType.SCHOOL_AGE,
+    address: "145 Tremont St, Boston, MA 02111",
+    city: "Boston",
+    region: "Boston",
+    licensingRegion: "Metro Boston",
+    subsidyRegion: "Metro Boston",
+  },
+  {
+    id: "program-pioneer-valley",
+    stateProviderId: "PID-100862",
+    programName: "Pioneer Valley Learning Hub",
+    providerType: ProviderType.CENTER_BASED,
+    address: "9 Market St, Northampton, MA 01060",
+    city: "Northampton",
+    region: "Western",
+    licensingRegion: "Western",
+    subsidyRegion: "Western",
+  },
+];
+
 async function main() {
   for (const agency of agencies) {
     await prisma.agency.upsert({
@@ -68,6 +164,14 @@ async function main() {
         ...session,
         status: SessionStatus.PUBLISHED,
       },
+    });
+  }
+
+  for (const program of providerPrograms) {
+    await prisma.providerProgram.upsert({
+      where: { stateProviderId: program.stateProviderId },
+      update: program,
+      create: program,
     });
   }
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, UserButton } from "@clerk/nextjs";
+import { useAuth, useUser, UserButton } from "@clerk/nextjs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,19 +21,31 @@ type Session = {
   meetingUrl: string | null;
 };
 
-type Registration = {
+type ProviderProgram = {
+  stateProviderId: string;
+  programName: string;
+  providerType: string;
+  address: string;
+  city: string;
+  region: string;
+};
+
+type ProviderRegistration = {
   id: string;
-  title: string;
-  dateLabel: string;
-  time: string;
-  format: string;
-  agency: string;
-  status: "Confirmed" | "Pending";
+  status: string;
+  session: {
+    id: string;
+    title: string;
+    format: "VIRTUAL" | "IN_PERSON";
+    startsAt: string;
+    endsAt: string;
+    locationName: string | null;
+    agency: { id: string; name: string; region: string };
+  };
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const REGIONS = ["All Regions", "Northeast", "Metro", "Boston", "Central", "Western", "Southeast"];
 const DATE_RANGES = ["Next 30 days", "Next 7 days", "Next 90 days", "All upcoming"];
 const FORMATS = ["All Formats", "Virtual", "In-person"];
 const PROVIDER_TYPES = [
@@ -44,11 +56,170 @@ const PROVIDER_TYPES = [
   { value: "OTHER", label: "Other" },
 ];
 
-// Mock registrations — will be replaced with real data later
-const REGISTRATIONS: Registration[] = [
-  { id: "1", title: "EEC Mandatory Orientation – Nov 20", dateLabel: "NOV 20", time: "6:30 PM", format: "Virtual", agency: "Child Care Circuit", status: "Confirmed" },
-  { id: "2", title: "Business Practice Workshop", dateLabel: "DEC 05", time: "10:00 AM", format: "In-person (Springfield)", agency: "Seven Hills", status: "Pending" },
-];
+function formatDateLabel(iso: string) {
+  const date = new Date(iso);
+  return {
+    month: date.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+    day: date.getDate().toString(),
+  };
+}
+
+function formatSessionTime(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const end = new Date(endsAt).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${start} – ${end}`;
+}
+
+function formatSessionFormat(
+  format: "VIRTUAL" | "IN_PERSON",
+  locationName: string | null,
+) {
+  if (format === "VIRTUAL") {
+    return "Virtual";
+  }
+
+  return locationName ? `In-person (${locationName})` : "In-person";
+}
+
+function registrationStatusLabel(status: string): "Confirmed" | "Pending" {
+  if (status === "WAITLISTED") {
+    return "Pending";
+  }
+
+  return "Confirmed";
+}
+
+function getDateRangeParams(dateRange: string) {
+  if (dateRange === "All upcoming") {
+    return {};
+  }
+
+  const today = new Date();
+  const format = (date: Date) => date.toISOString().slice(0, 10);
+  const days =
+    dateRange === "Next 7 days" ? 7 : dateRange === "Next 30 days" ? 30 : 90;
+  const end = new Date(today);
+  end.setUTCDate(end.getUTCDate() + days + 1);
+
+  return {
+    from: format(today),
+    to: format(end),
+  };
+}
+
+// ─── Program Lookup ───────────────────────────────────────────────────────────
+
+function ProgramLookup({
+  onSelect,
+}: {
+  onSelect: (program: ProviderProgram) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ProviderProgram[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+
+    if (trimmed.length < 2) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/provider/programs?query=${encodeURIComponent(trimmed)}`,
+        );
+        const json = await res.json();
+
+        if (json.success) {
+          setResults(json.data.programs);
+          setOpen(json.data.programs.length > 0);
+        }
+      } catch {
+        setResults([]);
+        setOpen(false);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleSelect(program: ProviderProgram) {
+    onSelect(program);
+    setQuery(program.programName);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className="relative flex flex-col gap-1">
+      <label className="text-xs font-medium text-zinc-600">
+        Program Lookup
+      </label>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => {
+          if (results.length > 0) {
+            setOpen(true);
+          }
+        }}
+        placeholder="Search by program name, provider ID, or city"
+        className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]"
+      />
+      {loading && (
+        <p className="text-xs text-zinc-400">Searching programs...</p>
+      )}
+      {open && results.length > 0 && (
+        <ul className="absolute top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-lg">
+          {results.map((program) => (
+            <li key={program.stateProviderId}>
+              <button
+                type="button"
+                onClick={() => handleSelect(program)}
+                className="w-full px-3 py-2 text-left hover:bg-zinc-50"
+              >
+                <p className="text-sm font-medium text-zinc-800">
+                  {program.programName}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  {program.stateProviderId} · {program.city}, {program.region}
+                </p>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 // ─── Registration Modal ───────────────────────────────────────────────────────
 
@@ -61,28 +232,96 @@ function RegistrationModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const { user } = useUser();
   const [form, setForm] = useState({
     providerName: "",
     organizationName: "",
     contactEmail: "",
     phone: "",
     providerType: "UNKNOWN",
+    stateProviderId: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const res = await fetch("/api/me");
+        const json = await res.json();
+
+        if (!json.success || json.data.profile.source !== "APP_USER") {
+          return;
+        }
+
+        const profile = json.data.profile;
+        setForm((prev) => ({
+          ...prev,
+          providerName: profile.providerName ?? prev.providerName,
+          organizationName: profile.organizationName ?? prev.organizationName,
+          contactEmail: profile.email ?? prev.contactEmail,
+          phone: profile.phone ?? prev.phone,
+          providerType: profile.providerType ?? prev.providerType,
+        }));
+      } catch {
+        // Profile prefill is best-effort.
+      }
+    }
+
+    loadProfile();
+  }, []);
+
+  useEffect(() => {
+    const email = user?.primaryEmailAddress?.emailAddress;
+    const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
+
+    if (email || name) {
+      setForm((prev) => ({
+        ...prev,
+        contactEmail: prev.contactEmail || email || "",
+        providerName: prev.providerName || name || "",
+      }));
+    }
+  }, [user]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
+  function handleProgramSelect(program: ProviderProgram) {
+    setForm((prev) => ({
+      ...prev,
+      organizationName: program.programName,
+      providerType: program.providerType,
+      stateProviderId: program.stateProviderId,
+    }));
+  }
+
   async function handleSubmit() {
+    if (!form.providerName.trim() || !form.organizationName.trim() || !form.contactEmail.trim()) {
+      setError("Provider name, organization name, and contact email are required.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
+      const payload = {
+        sessionId: session.id,
+        providerName: form.providerName.trim(),
+        organizationName: form.organizationName.trim(),
+        contactEmail: form.contactEmail.trim(),
+        phone: form.phone.trim() || undefined,
+        providerType: form.providerType,
+        ...(form.stateProviderId.trim()
+          ? { stateProviderId: form.stateProviderId.trim() }
+          : {}),
+      };
+
       const res = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, sessionId: session.id }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -121,6 +360,7 @@ function RegistrationModal({
             {/* Registration Details */}
             <div className="border border-zinc-200 rounded-lg p-4 flex flex-col gap-4">
               <h3 className="font-semibold text-zinc-800">Registration Details</h3>
+              <ProgramLookup onSelect={handleProgramSelect} />
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-zinc-600">Provider Name</label>
@@ -269,8 +509,14 @@ function SessionCard({ session, onRegister }: { session: Session; onRegister: (s
   );
 }
 
-function RegistrationRow({ reg }: { reg: Registration }) {
-  const [month, day] = reg.dateLabel.split(" ");
+function RegistrationRow({ registration }: { registration: ProviderRegistration }) {
+  const { month, day } = formatDateLabel(registration.session.startsAt);
+  const status = registrationStatusLabel(registration.status);
+  const formatLabel = formatSessionFormat(
+    registration.session.format,
+    registration.session.locationName,
+  );
+
   return (
     <div className="flex items-center justify-between py-3 border-b border-zinc-100 last:border-0">
       <div className="flex items-center gap-4">
@@ -279,12 +525,14 @@ function RegistrationRow({ reg }: { reg: Registration }) {
           <div className="text-base font-bold leading-tight">{day}</div>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-800">{reg.title}</p>
-          <p className="text-xs text-zinc-500">{reg.time} · {reg.format} · {reg.agency}</p>
+          <p className="text-sm font-medium text-zinc-800">{registration.session.title}</p>
+          <p className="text-xs text-zinc-500">
+            {formatSessionTime(registration.session.startsAt, registration.session.endsAt)} · {formatLabel} · {registration.session.agency.name}
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${reg.status === "Confirmed" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>{reg.status}</span>
+        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${status === "Confirmed" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>{status}</span>
         <button className="text-xs text-red-500 hover:text-red-700 font-medium">Cancel Registration</button>
       </div>
     </div>
@@ -297,17 +545,60 @@ export default function ProviderPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const [region, setRegion] = useState("All Regions");
+  const [regions, setRegions] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState("Next 30 days");
   const [format, setFormat] = useState("All Formats");
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [registrations, setRegistrations] = useState<ProviderRegistration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [registrationsLoading, setRegistrationsLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [registeredSession, setRegisteredSession] = useState<Session | null>(null);
+  const [registrationsKey, setRegistrationsKey] = useState(0);
 
   // Redirect if not logged in
   useEffect(() => {
     if (isLoaded && !userId) router.push("/sign-in");
   }, [isLoaded, userId, router]);
+
+  useEffect(() => {
+    async function fetchRegions() {
+      try {
+        const res = await fetch("/api/sessions/regions");
+        const json = await res.json();
+
+        if (json.success) {
+          setRegions(json.data.regions);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    fetchRegions();
+  }, []);
+
+  useEffect(() => {
+    async function fetchRegistrations() {
+      setRegistrationsLoading(true);
+      try {
+        const res = await fetch("/api/provider/registrations");
+        const json = await res.json();
+
+        if (json.success) {
+          setRegistrations(json.data.registrations);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setRegistrationsLoading(false);
+      }
+    }
+
+    if (isLoaded && userId) {
+      fetchRegistrations();
+    }
+  }, [isLoaded, userId, registrationsKey]);
 
   // Fetch real sessions from API whenever filters change
   useEffect(() => {
@@ -318,17 +609,28 @@ export default function ProviderPage() {
         if (region !== "All Regions") params.set("region", region);
         if (format === "Virtual") params.set("format", "VIRTUAL");
         if (format === "In-person") params.set("format", "IN_PERSON");
+
+        const range = getDateRangeParams(dateRange);
+        if (range.from) params.set("from", range.from);
+        if (range.to) params.set("to", range.to);
+
         const res = await fetch(`/api/sessions?${params.toString()}`);
         const json = await res.json();
-        setSessions(json.data.sessions);
+
+        if (json.success) {
+          setSessions(json.data.sessions);
+        } else {
+          setSessions([]);
+        }
       } catch (e) {
         console.error(e);
+        setSessions([]);
       } finally {
         setLoading(false);
       }
     }
     fetchSessions();
-  }, [region, format]);
+  }, [region, format, dateRange]);
 
   if (!isLoaded || !userId) return null;
 
@@ -344,6 +646,7 @@ export default function ProviderPage() {
           onSuccess={() => {
             setRegisteredSession(selectedSession);
             setSelectedSession(null);
+            setRegistrationsKey((current) => current + 1);
           }}
         />
       )}
@@ -365,7 +668,7 @@ export default function ProviderPage() {
         {/* Filters */}
         <div className="border border-zinc-200 rounded-lg bg-white p-4 flex flex-wrap gap-4 items-end">
           {[
-            { label: "Region", value: region, setter: setRegion, opts: REGIONS },
+            { label: "Region", value: region, setter: setRegion, opts: ["All Regions", ...regions] },
             { label: "Date Range", value: dateRange, setter: setDateRange, opts: DATE_RANGES },
             { label: "Format", value: format, setter: setFormat, opts: FORMATS },
           ].map(({ label, value, setter, opts }) => (
@@ -376,7 +679,6 @@ export default function ProviderPage() {
               </select>
             </div>
           ))}
-          <button className="bg-[#1a2f5e] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors">Apply Filters</button>
         </div>
 
         {/* Sessions Grid */}
@@ -399,7 +701,15 @@ export default function ProviderPage() {
         {/* My Registrations */}
         <section className="border border-zinc-200 rounded-lg bg-white p-6">
           <h2 className="font-semibold text-zinc-800 mb-4">My Registrations</h2>
-          {REGISTRATIONS.map((r) => <RegistrationRow key={r.id} reg={r} />)}
+          {registrationsLoading ? (
+            <p className="text-sm text-zinc-400 py-4 text-center">Loading registrations...</p>
+          ) : registrations.length === 0 ? (
+            <p className="text-sm text-zinc-400 py-4 text-center">You have not registered for any sessions yet.</p>
+          ) : (
+            registrations.map((registration) => (
+              <RegistrationRow key={registration.id} registration={registration} />
+            ))
+          )}
         </section>
 
         {/* Attendance Note */}

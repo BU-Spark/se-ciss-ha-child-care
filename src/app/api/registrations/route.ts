@@ -12,6 +12,7 @@ const registrationSchema = z.object({
   organizationName: z.string().min(1),
   contactEmail: z.string().email(),
   phone: z.string().optional(),
+  stateProviderId: z.string().optional(),
   providerType: z
     .enum([
       ProviderType.CENTER_BASED,
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     const clerkUser = await currentUser();
     const primaryEmail =
       clerkUser?.primaryEmailAddress?.emailAddress ?? body.data.contactEmail;
+    const stateProviderId = body.data.stateProviderId?.trim();
 
     const result = await prisma.$transaction(async (tx) => {
       const session = await tx.orientationSession.findUnique({
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
           organizationName: body.data.organizationName,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          ...(stateProviderId ? { stateProviderId } : {}),
         },
         create: {
           clerkUserId: userId,
@@ -95,6 +98,7 @@ export async function POST(request: Request) {
           organizationName: body.data.organizationName,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          ...(stateProviderId ? { stateProviderId } : {}),
         },
       });
 
