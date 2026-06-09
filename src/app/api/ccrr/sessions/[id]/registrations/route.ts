@@ -1,16 +1,8 @@
-import { RegistrationStatus } from "@prisma/client";
-
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { requireAgencyAccess, requireRole } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db";
-
-// Only registrations that can actually have attendance marked appear on the roster.
-const ROSTER_STATUSES: RegistrationStatus[] = [
-  RegistrationStatus.REGISTERED,
-  RegistrationStatus.ATTENDED,
-  RegistrationStatus.NO_SHOW,
-];
+import { rosterRegistrationStatusFilter } from "@/lib/registration-status";
 
 export async function GET(
   _request: Request,
@@ -25,7 +17,7 @@ export async function GET(
       include: {
         agency: { select: { id: true, name: true, region: true } },
         registrations: {
-          where: { status: { in: ROSTER_STATUSES } },
+          where: rosterRegistrationStatusFilter,
           orderBy: { createdAt: "asc" },
           select: {
             id: true,

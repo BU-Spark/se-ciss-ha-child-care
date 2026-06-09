@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, useUser, UserButton } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
+
+import { PersonaNav } from "@/components/persona-nav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,12 +128,18 @@ function ProgramLookup({
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    if (value.trim().length < 2) {
+      setResults([]);
+      setOpen(false);
+    }
+  }
+
   useEffect(() => {
     const trimmed = query.trim();
 
     if (trimmed.length < 2) {
-      setResults([]);
-      setOpen(false);
       return;
     }
 
@@ -185,7 +193,7 @@ function ProgramLookup({
       </label>
       <input
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => handleQueryChange(e.target.value)}
         onFocus={() => {
           if (results.length > 0) {
             setOpen(true);
@@ -246,42 +254,39 @@ function RegistrationModal({
 
   useEffect(() => {
     async function loadProfile() {
+      const email = user?.primaryEmailAddress?.emailAddress;
+      const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
+
       try {
         const res = await fetch("/api/me");
         const json = await res.json();
 
-        if (!json.success || json.data.profile.source !== "APP_USER") {
+        if (json.success && json.data.profile.source === "APP_USER") {
+          const profile = json.data.profile;
+          setForm((prev) => ({
+            ...prev,
+            providerName: profile.providerName ?? name ?? prev.providerName,
+            organizationName: profile.organizationName ?? prev.organizationName,
+            contactEmail: profile.email ?? email ?? prev.contactEmail,
+            phone: profile.phone ?? prev.phone,
+            providerType: profile.providerType ?? prev.providerType,
+          }));
           return;
         }
-
-        const profile = json.data.profile;
-        setForm((prev) => ({
-          ...prev,
-          providerName: profile.providerName ?? prev.providerName,
-          organizationName: profile.organizationName ?? prev.organizationName,
-          contactEmail: profile.email ?? prev.contactEmail,
-          phone: profile.phone ?? prev.phone,
-          providerType: profile.providerType ?? prev.providerType,
-        }));
       } catch {
         // Profile prefill is best-effort.
+      }
+
+      if (email || name) {
+        setForm((prev) => ({
+          ...prev,
+          contactEmail: prev.contactEmail || email || "",
+          providerName: prev.providerName || name || "",
+        }));
       }
     }
 
     loadProfile();
-  }, []);
-
-  useEffect(() => {
-    const email = user?.primaryEmailAddress?.emailAddress;
-    const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
-
-    if (email || name) {
-      setForm((prev) => ({
-        ...prev,
-        contactEmail: prev.contactEmail || email || "",
-        providerName: prev.providerName || name || "",
-      }));
-    }
   }, [user]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
@@ -390,7 +395,7 @@ function RegistrationModal({
             {/* Auto confirmation notice */}
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 flex gap-2">
               <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
-              <p className="text-xs text-blue-700">Upon clicking "Complete Registration", a confirmation email will be sent to the provided contact address containing the full session agenda and secure Zoom meeting link.</p>
+              <p className="text-xs text-blue-700">Upon clicking Complete Registration, a confirmation email will be sent to the provided contact address containing the full session agenda and secure Zoom meeting link.</p>
             </div>
 
             {/* Error */}
@@ -453,30 +458,6 @@ function SuccessModal({ session, onClose }: { session: Session; onClose: () => v
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function NavBar() {
-  const [active, setActive] = useState("Dashboard");
-  return (
-    <header className="border-b border-[#e2e6ed] bg-white sticky top-0 z-10">
-      <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-[#1a2f5e] flex items-center justify-center text-white text-xs font-bold">M</div>
-            <span className="font-semibold text-[#1a2f5e] text-sm">EEC Orientation</span>
-          </div>
-          <nav className="flex gap-1">
-            {["Dashboard", "Sessions", "Resources"].map((tab) => (
-              <button key={tab} onClick={() => setActive(tab)} className={`px-3 py-1.5 text-sm font-medium transition-colors ${active === tab ? "text-[#1a2f5e] border-b-2 border-[#1a2f5e]" : "text-zinc-500 hover:text-zinc-800"}`}>{tab}</button>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <UserButton />
-        </div>
-      </div>
-    </header>
-  );
-}
 
 function SessionCard({ session, onRegister }: { session: Session; onRegister: (s: Session) => void }) {
   const urgent = session.spotsLeft !== null && session.spotsLeft <= 3;
@@ -552,14 +533,34 @@ export default function ProviderPage() {
   const [registrations, setRegistrations] = useState<ProviderRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [registrationsLoading, setRegistrationsLoading] = useState(true);
+  const [registrationsError, setRegistrationsError] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [registeredSession, setRegisteredSession] = useState<Session | null>(null);
   const [registrationsKey, setRegistrationsKey] = useState(0);
+  const [profileSource, setProfileSource] = useState<string | null>(null);
 
   // Redirect if not logged in
   useEffect(() => {
     if (isLoaded && !userId) router.push("/sign-in");
   }, [isLoaded, userId, router]);
+
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const res = await fetch("/api/me");
+        const json = await res.json();
+        if (json.success) {
+          setProfileSource(json.data.profile.source);
+        }
+      } catch {
+        // Profile lookup is best-effort.
+      }
+    }
+
+    if (isLoaded && userId) {
+      fetchProfile();
+    }
+  }, [isLoaded, userId]);
 
   useEffect(() => {
     async function fetchRegions() {
@@ -581,15 +582,24 @@ export default function ProviderPage() {
   useEffect(() => {
     async function fetchRegistrations() {
       setRegistrationsLoading(true);
+      setRegistrationsError(null);
       try {
         const res = await fetch("/api/provider/registrations");
         const json = await res.json();
 
         if (json.success) {
           setRegistrations(json.data.registrations);
+        } else {
+          setRegistrations([]);
+          setRegistrationsError(
+            res.status === 403
+              ? "Staff accounts cannot view provider registrations. Use a provider account, or open the CCR&R dashboard."
+              : json.error?.message ?? "Unable to load your registrations.",
+          );
         }
       } catch (e) {
         console.error(e);
+        setRegistrationsError("Network error. Please try again.");
       } finally {
         setRegistrationsLoading(false);
       }
@@ -636,7 +646,7 @@ export default function ProviderPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
-      <NavBar />
+      <PersonaNav basePath="/provider" />
 
       {/* Registration modal */}
       {selectedSession && !registeredSession && (
@@ -663,6 +673,19 @@ export default function ProviderPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#1a2f5e]">Orientation Dashboard</h1>
           <p className="mt-1 text-sm text-zinc-500">Register for upcoming orientation sessions required for Massachusetts child care providers. Browse available slots by region and format.</p>
+          {profileSource === "STAFF_USER" && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              You are signed in as staff. Provider registration is not available on this account.{" "}
+              <button
+                type="button"
+                onClick={() => router.push("/ccrr")}
+                className="font-medium underline hover:text-amber-950"
+              >
+                Go to the CCR&R staff dashboard
+              </button>
+              .
+            </div>
+          )}
         </div>
 
         {/* Filters */}
@@ -682,7 +705,7 @@ export default function ProviderPage() {
         </div>
 
         {/* Sessions Grid */}
-        <section>
+        <section id="sessions">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-zinc-800">Available Orientations</h2>
             <span className="text-sm text-zinc-500">{loading ? "Loading..." : `Showing ${sessions.length} results`}</span>
@@ -703,6 +726,8 @@ export default function ProviderPage() {
           <h2 className="font-semibold text-zinc-800 mb-4">My Registrations</h2>
           {registrationsLoading ? (
             <p className="text-sm text-zinc-400 py-4 text-center">Loading registrations...</p>
+          ) : registrationsError ? (
+            <p className="text-sm text-red-600 py-4 text-center">{registrationsError}</p>
           ) : registrations.length === 0 ? (
             <p className="text-sm text-zinc-400 py-4 text-center">You have not registered for any sessions yet.</p>
           ) : (
@@ -713,7 +738,7 @@ export default function ProviderPage() {
         </section>
 
         {/* Attendance Note */}
-        <div className="border border-amber-200 bg-amber-50 rounded-lg px-5 py-4">
+        <div id="resources" className="border border-amber-200 bg-amber-50 rounded-lg px-5 py-4">
           <p className="text-sm font-semibold text-amber-900">Important Attendance Note</p>
           <p className="text-sm text-amber-800 mt-0.5">Attendance is tracked for all virtual sessions. Please ensure you sign in with the same email used for registration to receive your certificate of completion.</p>
         </div>

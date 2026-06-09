@@ -3,6 +3,7 @@ import { SessionFormat } from "@prisma/client";
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
+import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 
 function parseFormat(format: string | null) {
   if (!format) {
@@ -123,9 +124,7 @@ export async function GET(request: Request) {
         _count: {
           select: {
             registrations: {
-              where: {
-                status: "REGISTERED",
-              },
+              where: activeRegistrationStatusFilter,
             },
           },
         },

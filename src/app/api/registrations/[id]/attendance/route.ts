@@ -7,7 +7,8 @@ import { requireAgencyAccess, requireRole } from "@/lib/auth/current-profile";
 import { prisma } from "@/lib/db";
 
 const attendanceSchema = z.object({
-  attendanceStatus: z.enum(["ATTENDED", "NO_SHOW"]),
+  attendanceStatus: z.enum(["ATTENDED", "NO_SHOW", "NOT_MARKED"]),
+  notes: z.string().nullable().optional(),
 });
 
 const ATTENDANCE_ELIGIBLE_STATUSES: RegistrationStatus[] = [
@@ -60,22 +61,34 @@ export async function PATCH(
     await requireAgencyAccess(registration.session.agencyId);
 
     const now = new Date();
-    const updatedRegistration = await prisma.registration.update({
-      where: { id },
-      data:
-        body.data.attendanceStatus === "ATTENDED"
+    const attendanceUpdate =
+      body.data.attendanceStatus === "ATTENDED"
+        ? {
+            status: RegistrationStatus.ATTENDED,
+            attendanceStatus: "ATTENDED" as const,
+            checkedInAt: now,
+            completedAt: now,
+          }
+        : body.data.attendanceStatus === "NO_SHOW"
           ? {
-              status: RegistrationStatus.ATTENDED,
-              attendanceStatus: "ATTENDED",
-              checkedInAt: now,
-              completedAt: now,
-            }
-          : {
               status: RegistrationStatus.NO_SHOW,
-              attendanceStatus: "NO_SHOW",
+              attendanceStatus: "NO_SHOW" as const,
               checkedInAt: null,
               completedAt: null,
-            },
+            }
+          : {
+              status: RegistrationStatus.REGISTERED,
+              attendanceStatus: "NOT_MARKED" as const,
+              checkedInAt: null,
+              completedAt: null,
+            };
+
+    const updatedRegistration = await prisma.registration.update({
+      where: { id },
+      data: {
+        ...attendanceUpdate,
+        ...(body.data.notes !== undefined ? { notes: body.data.notes } : {}),
+      },
     });
 
     return jsonSuccess({
@@ -84,6 +97,7 @@ export async function PATCH(
         sessionId: updatedRegistration.sessionId,
         status: updatedRegistration.status,
         attendanceStatus: updatedRegistration.attendanceStatus,
+        notes: updatedRegistration.notes,
         checkedInAt: updatedRegistration.checkedInAt?.toISOString() ?? null,
         completedAt: updatedRegistration.completedAt?.toISOString() ?? null,
       },

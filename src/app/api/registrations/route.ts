@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
+import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 
 const registrationSchema = z.object({
   sessionId: z.string().min(1),
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
       const registeredCount = await tx.registration.count({
         where: {
           sessionId: session.id,
-          status: "REGISTERED",
+          ...activeRegistrationStatusFilter,
         },
       });
       const capacity = session.capacity ?? 0;
