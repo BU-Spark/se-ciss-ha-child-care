@@ -1,5 +1,6 @@
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { requireRole } from "@/lib/auth/require-user";
+import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 import { prisma } from "@/lib/db";
 
@@ -106,6 +107,10 @@ export async function GET() {
         regions: [
           "All Regions",
           ...Array.from(new Set(agencies.map((agency) => agency.region))).sort(),
+        ],
+        languages: [
+          "All Languages",
+          ...SUPPORTED_LANGUAGES.map((language) => language.code),
         ],
       },
     });

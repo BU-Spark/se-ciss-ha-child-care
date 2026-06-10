@@ -33,6 +33,7 @@ const sessions = [
     endsAt: new Date("2026-06-14T16:30:00.000Z"),
     capacity: 25,
     meetingUrl: "https://example.com/zoom-link",
+    language: "en",
   },
   {
     id: "session-licensing-review-2026-06-21",
@@ -45,6 +46,7 @@ const sessions = [
     capacity: 25,
     locationName: "Seven Hills Family Services",
     address: "Worcester, MA",
+    language: "es",
   },
   {
     id: "session-health-safety-2026-06-28",
@@ -56,6 +58,7 @@ const sessions = [
     endsAt: new Date("2026-06-28T15:30:00.000Z"),
     capacity: 25,
     meetingUrl: "https://example.com/teams-link",
+    language: "pt",
   },
   {
     id: "seed-session-boston-virtual",
@@ -68,6 +71,7 @@ const sessions = [
     endsAt: new Date("2026-06-09T16:00:00.000Z"),
     capacity: 30,
     meetingUrl: "https://example.com/zoom/boston-orientation",
+    language: "es",
   },
   {
     id: "seed-session-boston-person",
@@ -80,6 +84,7 @@ const sessions = [
     endsAt: new Date("2026-06-16T16:00:00.000Z"),
     capacity: 25,
     locationName: "100 Cambridge Street, Boston, MA",
+    language: "en",
   },
   {
     id: "seed-session-northeast-virtual",
@@ -92,6 +97,7 @@ const sessions = [
     endsAt: new Date("2026-06-23T19:00:00.000Z"),
     capacity: 40,
     meetingUrl: "https://example.com/zoom/northeast-orientation",
+    language: "zh",
   },
   {
     id: "seed-session-western-past",
@@ -104,6 +110,7 @@ const sessions = [
     endsAt: new Date("2026-05-23T16:00:00.000Z"),
     capacity: 20,
     locationName: "Springfield Public Library, Springfield, MA",
+    language: "ht",
   },
 ];
 
@@ -269,6 +276,7 @@ const providerUsers = [
     providerType: ProviderType.CENTER_BASED,
     stateProviderId: "PID-100112",
     phone: "(555) 010-0001",
+    preferredLanguage: "es",
   },
   {
     id: "appuser-james-chen",
@@ -281,6 +289,7 @@ const providerUsers = [
     providerType: ProviderType.FAMILY_CHILD_CARE,
     stateProviderId: "PID-100214",
     phone: "(555) 010-0002",
+    preferredLanguage: "zh",
   },
   {
     id: "appuser-althea-jenkins",
@@ -293,6 +302,7 @@ const providerUsers = [
     providerType: ProviderType.CENTER_BASED,
     stateProviderId: "PID-100533",
     phone: "(555) 010-0003",
+    preferredLanguage: "en",
   },
   {
     id: "appuser-devon-walsh",
@@ -380,6 +390,7 @@ const registrations = [
     providerType: ProviderType.CENTER_BASED,
     status: RegistrationStatus.REGISTERED,
     attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "es",
     notes: null,
     createdAt: new Date("2026-06-02T15:00:00.000Z"),
   },
@@ -394,6 +405,7 @@ const registrations = [
     providerType: ProviderType.FAMILY_CHILD_CARE,
     status: RegistrationStatus.ATTENDED,
     attendanceStatus: AttendanceStatus.ATTENDED,
+    preferredLanguage: "zh",
     notes: "Arrived 5 mins late",
     checkedInAt: new Date("2026-06-14T14:05:00.000Z"),
     completedAt: new Date("2026-06-14T16:30:00.000Z"),
@@ -410,6 +422,7 @@ const registrations = [
     providerType: ProviderType.CENTER_BASED,
     status: RegistrationStatus.REGISTERED,
     attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "en",
     notes: null,
     createdAt: new Date("2026-06-05T18:00:00.000Z"),
   },
@@ -565,11 +578,11 @@ async function main() {
     });
   }
 
-  if (!process.env.SEED_BOSTON_RESOURCE_CLERK_USER_ID) {
-    console.log(
-      "\nTip: set SEED_BOSTON_RESOURCE_CLERK_USER_ID in .env to your Clerk user ID, then re-run npm run db:seed to access /ccrr as Boston Child Care Resource Center staff.",
-    );
-  }
+  console.log(
+    "\nTest accounts: run `npm run account:link -- <role> <clerkUserId> [agencyId]` after signing up in Clerk.",
+    "\nRoles: provider | ccrr | eec",
+    "\nExample: npm run account:link -- ccrr user_abc123 seed-agency-boston",
+  );
 }
 
 main()

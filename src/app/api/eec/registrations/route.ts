@@ -62,6 +62,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const agency = searchParams.get("agency");
     const region = searchParams.get("region");
+    const language = searchParams.get("language");
     const dateRange = searchParams.get("dateRange");
     const providerType = parseProviderType(searchParams.get("providerType"));
     const now = new Date();
@@ -73,6 +74,9 @@ export async function GET(request: Request) {
         ...(registrationDate ? { createdAt: registrationDate } : {}),
         ...(providerType
           ? { providerType: providerType as string }
+          : {}),
+        ...(language && language !== "All Languages"
+          ? { preferredLanguage: { equals: language, mode: "insensitive" } }
           : {}),
         session: {
           ...(region && region !== "All Regions"
@@ -110,6 +114,7 @@ export async function GET(request: Request) {
         contactEmail: registration.contactEmail,
         agency: registration.session.agency.name,
         region: registration.session.region,
+        preferredLanguage: registration.preferredLanguage,
         sessionTitle: registration.session.title,
         sessionDate: registration.session.startsAt.toISOString(),
         format:

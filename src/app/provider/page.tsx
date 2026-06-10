@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
+import { getLanguageLabel, SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Session = {
   id: string;
   region: string;
+  language: string;
   title: string;
   startsAt: string;
   endsAt: string;
@@ -21,6 +23,12 @@ type Session = {
   registeredCount: number;
   locationName: string | null;
   meetingUrl: string | null;
+};
+
+type AgencyOption = {
+  id: string;
+  name: string;
+  region: string;
 };
 
 type ProviderProgram = {
@@ -240,7 +248,6 @@ function RegistrationModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const { user } = useUser();
   const [form, setForm] = useState({
     providerName: "",
     organizationName: "",
@@ -248,15 +255,13 @@ function RegistrationModal({
     phone: "",
     providerType: "UNKNOWN",
     stateProviderId: "",
+    preferredLanguage: "en",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadProfile() {
-      const email = user?.primaryEmailAddress?.emailAddress;
-      const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
-
       try {
         const res = await fetch("/api/me");
         const json = await res.json();
@@ -265,29 +270,21 @@ function RegistrationModal({
           const profile = json.data.profile;
           setForm((prev) => ({
             ...prev,
-            providerName: profile.providerName ?? name ?? prev.providerName,
+            providerName: profile.providerName ?? profile.name ?? prev.providerName,
             organizationName: profile.organizationName ?? prev.organizationName,
-            contactEmail: profile.email ?? email ?? prev.contactEmail,
+            contactEmail: profile.email ?? prev.contactEmail,
             phone: profile.phone ?? prev.phone,
             providerType: profile.providerType ?? prev.providerType,
+            preferredLanguage: profile.preferredLanguage ?? prev.preferredLanguage,
           }));
-          return;
         }
       } catch {
         // Profile prefill is best-effort.
       }
-
-      if (email || name) {
-        setForm((prev) => ({
-          ...prev,
-          contactEmail: prev.contactEmail || email || "",
-          providerName: prev.providerName || name || "",
-        }));
-      }
     }
 
     loadProfile();
-  }, [user]);
+  }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -318,6 +315,7 @@ function RegistrationModal({
         contactEmail: form.contactEmail.trim(),
         phone: form.phone.trim() || undefined,
         providerType: form.providerType,
+        preferredLanguage: form.preferredLanguage,
         ...(form.stateProviderId.trim()
           ? { stateProviderId: form.stateProviderId.trim() }
           : {}),
@@ -384,11 +382,21 @@ function RegistrationModal({
                   <input name="phone" value={form.phone} onChange={handleChange} placeholder="(555) 000-0000" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-zinc-600">Provider Type</label>
-                <select name="providerType" value={form.providerType} onChange={handleChange} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
-                  {PROVIDER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-600">Provider Type</label>
+                  <select name="providerType" value={form.providerType} onChange={handleChange} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
+                    {PROVIDER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-600">Preferred Language</label>
+                  <select name="preferredLanguage" value={form.preferredLanguage} onChange={handleChange} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
+                    {SUPPORTED_LANGUAGES.map((language) => (
+                      <option key={language.code} value={language.code}>{language.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -475,10 +483,11 @@ function SessionCard({ session, onRegister }: { session: Session; onRegister: (s
       </div>
       <h3 className="font-semibold text-[#1a2f5e]">{session.title}</h3>
       <div className="flex flex-col gap-1 text-sm text-zinc-600">
-        <span>📅 {new Date(session.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-        <span>🕐 {new Date(session.startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – {new Date(session.endsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
-        <span>🏢 {session.agency.name}</span>
-        <span>💻 {formatDetail}</span>
+        <span> {new Date(session.startsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+        <span> {new Date(session.startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – {new Date(session.endsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+        <span>{session.agency.name}</span>
+        <span>{getLanguageLabel(session.language)}</span>
+        <span>{formatDetail}</span>
       </div>
       <button
         onClick={() => onRegister(session)}
@@ -527,6 +536,10 @@ export default function ProviderPage() {
   const router = useRouter();
   const [region, setRegion] = useState("All Regions");
   const [regions, setRegions] = useState<string[]>([]);
+  const [agency, setAgency] = useState("All Agencies");
+  const [agencies, setAgencies] = useState<AgencyOption[]>([]);
+  const [language, setLanguage] = useState("All Languages");
+  const [sessionLanguages, setSessionLanguages] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState("Next 30 days");
   const [format, setFormat] = useState("All Formats");
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -563,20 +576,24 @@ export default function ProviderPage() {
   }, [isLoaded, userId]);
 
   useEffect(() => {
-    async function fetchRegions() {
+    async function fetchFilterOptions() {
       try {
-        const res = await fetch("/api/sessions/regions");
+        const res = await fetch("/api/sessions/filter-options");
         const json = await res.json();
 
         if (json.success) {
           setRegions(json.data.regions);
+          setAgencies(json.data.agencies);
+          setSessionLanguages(
+            json.data.languages.map((entry: { code: string }) => entry.code),
+          );
         }
       } catch (e) {
         console.error(e);
       }
     }
 
-    fetchRegions();
+    fetchFilterOptions();
   }, []);
 
   useEffect(() => {
@@ -617,6 +634,8 @@ export default function ProviderPage() {
       try {
         const params = new URLSearchParams();
         if (region !== "All Regions") params.set("region", region);
+        if (agency !== "All Agencies") params.set("agency", agency);
+        if (language !== "All Languages") params.set("language", language);
         if (format === "Virtual") params.set("format", "VIRTUAL");
         if (format === "In-person") params.set("format", "IN_PERSON");
 
@@ -640,7 +659,7 @@ export default function ProviderPage() {
       }
     }
     fetchSessions();
-  }, [region, format, dateRange]);
+  }, [region, agency, language, format, dateRange]);
 
   if (!isLoaded || !userId) return null;
 
@@ -672,7 +691,7 @@ export default function ProviderPage() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
         <div>
           <h1 className="text-2xl font-bold text-[#1a2f5e]">Orientation Dashboard</h1>
-          <p className="mt-1 text-sm text-zinc-500">Register for upcoming orientation sessions required for Massachusetts child care providers. Browse available slots by region and format.</p>
+          <p className="mt-1 text-sm text-zinc-500">Register for upcoming orientation sessions required for Massachusetts child care providers. Browse available slots by agency, region, language, and format.</p>
           {profileSource === "STAFF_USER" && (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               You are signed in as staff. Provider registration is not available on this account.{" "}
@@ -691,14 +710,18 @@ export default function ProviderPage() {
         {/* Filters */}
         <div className="border border-zinc-200 rounded-lg bg-white p-4 flex flex-wrap gap-4 items-end">
           {[
+            { label: "CCR&R Agency", value: agency, setter: setAgency, opts: ["All Agencies", ...agencies.map((entry) => entry.name)] },
             { label: "Region", value: region, setter: setRegion, opts: ["All Regions", ...regions] },
+            { label: "Session Language", value: language, setter: setLanguage, opts: ["All Languages", ...sessionLanguages], formatOption: (option: string) => option === "All Languages" ? option : getLanguageLabel(option) },
             { label: "Date Range", value: dateRange, setter: setDateRange, opts: DATE_RANGES },
             { label: "Format", value: format, setter: setFormat, opts: FORMATS },
-          ].map(({ label, value, setter, opts }) => (
+          ].map(({ label, value, setter, opts, formatOption }) => (
             <div key={label} className="flex flex-col gap-1 min-w-[160px]">
               <label className="text-xs text-zinc-500 font-medium">{label}</label>
               <select value={value} onChange={(e) => setter(e.target.value)} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
-                {opts.map((o) => <option key={o}>{o}</option>)}
+                {opts.map((o) => (
+                  <option key={o} value={o}>{formatOption ? formatOption(o) : o}</option>
+                ))}
               </select>
             </div>
           ))}

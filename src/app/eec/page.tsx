@@ -4,11 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, UserButton } from "@clerk/nextjs";
 
+import { getLanguageLabel } from "@/lib/languages";
+
 type Registration = {
   id: string;
   providerName: string;
   agency: string;
   region: string;
+  preferredLanguage: string;
   sessionDate: string;
   format: string;
   status: "Attended" | "Registered" | "No-show";
@@ -64,12 +67,14 @@ export default function EecPage() {
   const [region, setRegion] = useState("All Regions");
   const [dateRange, setDateRange] = useState("Last 30 Days");
   const [providerType, setProviderType] = useState("All Types");
+  const [language, setLanguage] = useState("All Languages");
   const [stats, setStats] = useState<EecStats | null>(null);
   const [regionalRates, setRegionalRates] = useState<RegionalRate[]>([]);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [agencies, setAgencies] = useState<string[]>(["All Agencies"]);
   const [regions, setRegions] = useState<string[]>(["All Regions"]);
+  const [languages, setLanguages] = useState<string[]>(["All Languages"]);
   const [adminName, setAdminName] = useState("State Administrator");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +113,7 @@ export default function EecPage() {
           setTrend(json.data.registrationsOverTime);
           setAgencies(json.data.filterOptions.agencies);
           setRegions(json.data.filterOptions.regions);
+          setLanguages(json.data.filterOptions.languages);
         }
       } catch {
         setError("Unable to load statewide stats.");
@@ -130,6 +136,7 @@ export default function EecPage() {
         if (region !== "All Regions") params.set("region", region);
         if (dateRange) params.set("dateRange", dateRange);
         if (providerType !== "All Types") params.set("providerType", providerType);
+        if (language !== "All Languages") params.set("language", language);
 
         const res = await fetch(`/api/eec/registrations?${params.toString()}`);
         const json = await res.json();
@@ -147,6 +154,7 @@ export default function EecPage() {
               providerName: string;
               agency: string;
               region: string;
+              preferredLanguage: string;
               sessionDate: string;
               format: string;
               status: Registration["status"];
@@ -167,7 +175,7 @@ export default function EecPage() {
     if (isLoaded && userId) {
       loadRegistrations();
     }
-  }, [isLoaded, userId, agency, region, dateRange, providerType]);
+  }, [isLoaded, userId, agency, region, dateRange, providerType, language]);
 
   const maxTrend = useMemo(
     () => Math.max(...trend.map((point) => point.count), 1),
@@ -175,11 +183,12 @@ export default function EecPage() {
   );
 
   function exportCsv() {
-    const headers = ["Provider Name", "Agency", "Region", "Session Date", "Format", "Status"];
+    const headers = ["Provider Name", "Agency", "Region", "Language", "Session Date", "Format", "Status"];
     const rows = registrations.map((registration) => [
       escapeCSV(registration.providerName),
       escapeCSV(registration.agency),
       escapeCSV(registration.region),
+      escapeCSV(getLanguageLabel(registration.preferredLanguage)),
       escapeCSV(registration.sessionDate),
       escapeCSV(registration.format),
       escapeCSV(registration.status),
@@ -289,7 +298,15 @@ export default function EecPage() {
                   { label: "Region", value: region, setter: setRegion, options: regions },
                   { label: "Date Range", value: dateRange, setter: setDateRange, options: DATE_RANGES },
                   { label: "Provider Type", value: providerType, setter: setProviderType, options: PROVIDER_TYPES },
-                ].map(({ label, value, setter, options }) => (
+                  {
+                    label: "Language",
+                    value: language,
+                    setter: setLanguage,
+                    options: languages,
+                    formatOption: (option: string) =>
+                      option === "All Languages" ? option : getLanguageLabel(option),
+                  },
+                ].map(({ label, value, setter, options, formatOption }) => (
                   <div key={label} className="flex flex-col gap-1">
                     <label className="text-xs text-zinc-400">{label}</label>
                     <select
@@ -298,7 +315,9 @@ export default function EecPage() {
                       className="border border-zinc-200 rounded-md px-2 py-1.5 text-xs text-zinc-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#1a2f5e] min-w-[130px]"
                     >
                       {options.map((option) => (
-                        <option key={option}>{option}</option>
+                        <option key={option} value={option}>
+                          {formatOption ? formatOption(option) : option}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -323,7 +342,7 @@ export default function EecPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-100 bg-zinc-50">
-                      {["Provider Name", "Agency", "Region", "Session Date", "Format", "Status"].map((header) => (
+                      {["Provider Name", "Agency", "Region", "Language", "Session Date", "Format", "Status"].map((header) => (
                         <th key={header} className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">
                           {header}
                         </th>
@@ -333,13 +352,13 @@ export default function EecPage() {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-zinc-400">
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-zinc-400">
                           Loading registrations...
                         </td>
                       </tr>
                     ) : registrations.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-zinc-400">
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-zinc-400">
                           No registrations match the selected filters.
                         </td>
                       </tr>
@@ -349,6 +368,9 @@ export default function EecPage() {
                           <td className="px-4 py-3 font-medium text-zinc-800">{registration.providerName}</td>
                           <td className="px-4 py-3 text-zinc-600">{registration.agency}</td>
                           <td className="px-4 py-3 text-zinc-600">{registration.region}</td>
+                          <td className="px-4 py-3 text-zinc-600">
+                            {getLanguageLabel(registration.preferredLanguage)}
+                          </td>
                           <td className="px-4 py-3 text-zinc-600">{registration.sessionDate}</td>
                           <td className="px-4 py-3 text-zinc-600">{registration.format}</td>
                           <td className="px-4 py-3">

@@ -19,7 +19,7 @@ export const personas: Persona[] = [
       "Find upcoming orientation sessions across all Massachusetts CCR&R regions, register online, and receive session details by email.",
     features: [
       "Browse virtual and in-person sessions statewide",
-      "Filter by region, date, and format",
+      "Filter by agency, region, language, date, and format",
       "Register and receive confirmation with session details",
     ],
   },
@@ -45,7 +45,7 @@ export const personas: Persona[] = [
       "Monitor orientation participation statewide with filters and exports to support program oversight and reporting.",
     features: [
       "Statewide registration and completion data",
-      "Filter by agency, region, date, and provider type",
+      "Filter by agency, region, language, date, and provider type",
       "Aggregate metrics and CSV export",
     ],
   },

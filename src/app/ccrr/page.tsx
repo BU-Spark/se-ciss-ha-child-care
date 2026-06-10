@@ -164,8 +164,17 @@ export default function CcrrPage() {
             </span>
           </div>
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-              {error}
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <p className="font-medium text-red-800">{error}</p>
+              <p className="mt-2 text-red-700">
+                In your project folder, run:
+              </p>
+              <code className="mt-1 block rounded bg-red-100 px-2 py-1 text-xs text-red-900">
+                npm run account:link -- ccrr YOUR_CLERK_USER_ID seed-agency-boston staff.boston@example.com &quot;Boston CCR&amp;R Staff&quot;
+              </code>
+              <p className="mt-2 text-red-700">
+                Replace <span className="font-mono">YOUR_CLERK_USER_ID</span> with your ID from the Clerk dashboard, then refresh this page.
+              </p>
             </div>
           )}
           {loading ? (

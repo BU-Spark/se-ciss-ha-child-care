@@ -96,6 +96,9 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const region = searchParams.get("region")?.trim();
+    const agency = searchParams.get("agency")?.trim();
+    const agencyId = searchParams.get("agencyId")?.trim();
+    const language = searchParams.get("language")?.trim();
     const format = parseFormat(searchParams.get("format"));
     const now = new Date();
     const windowBounds = getWindowBounds(searchParams, now);
@@ -110,6 +113,17 @@ export async function GET(request: Request) {
             }
           : { gte: now },
         ...(region ? { region: { equals: region, mode: "insensitive" } } : {}),
+        ...(agencyId ? { agencyId } : {}),
+        ...(agency && !agencyId
+          ? {
+              agency: {
+                name: { equals: agency, mode: "insensitive" },
+              },
+            }
+          : {}),
+        ...(language && language !== "All Languages"
+          ? { language: { equals: language, mode: "insensitive" } }
+          : {}),
         ...(format ? { format } : {}),
       },
       orderBy: { startsAt: "asc" },
@@ -141,6 +155,7 @@ export async function GET(request: Request) {
           title: session.title,
           description: session.description,
           region: session.region,
+          language: session.language,
           format: session.format,
           startsAt: session.startsAt.toISOString(),
           endsAt: session.endsAt.toISOString(),

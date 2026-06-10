@@ -86,6 +86,19 @@ export async function getCurrentProfile(): Promise<CurrentProfile> {
     };
   }
 
+  throw ApiError.forbidden(
+    "No profile is linked to this Clerk account. Run npm run account:link for your role.",
+    "PROFILE_NOT_LINKED",
+  );
+}
+
+async function provisionProviderProfile(): Promise<CurrentProfile> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    throw ApiError.unauthorized();
+  }
+
   const clerkUser = await currentUser();
 
   if (!clerkUser) {
@@ -135,7 +148,20 @@ export async function getCurrentProfile(): Promise<CurrentProfile> {
 }
 
 export async function requireAppUser(): Promise<AppUserWithAgency> {
-  const profile = await getCurrentProfile();
+  let profile: CurrentProfile;
+
+  try {
+    profile = await getCurrentProfile();
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.code === "PROFILE_NOT_LINKED"
+    ) {
+      profile = await provisionProviderProfile();
+    } else {
+      throw error;
+    }
+  }
 
   if (profile.source !== "APP_USER") {
     throw ApiError.forbidden("Provider profile required");
@@ -144,14 +170,54 @@ export async function requireAppUser(): Promise<AppUserWithAgency> {
   return profile.user;
 }
 
+function wrongRoleMessage(
+  role: UserRole,
+  allowedRoles: UserRole[],
+): string {
+  if (role === "PROVIDER" && allowedRoles.includes("CCRR_STAFF")) {
+    return "You are signed in as a provider. Link this Clerk user as CCR&R staff with: npm run account:link -- ccrr <clerkUserId> <agencyId> <email>";
+  }
+
+  if (role === "PROVIDER" && allowedRoles.includes("EEC_ADMIN")) {
+    return "You are signed in as a provider. Link this Clerk user as EEC admin with: npm run account:link -- eec <clerkUserId> <email>";
+  }
+
+  if (role === "CCRR_STAFF" && allowedRoles.includes("EEC_ADMIN")) {
+    return "You are signed in as CCR&R staff. Use an EEC admin account for this page, or run: npm run account:link -- eec <clerkUserId> <email>";
+  }
+
+  if (role === "EEC_ADMIN" && allowedRoles.includes("CCRR_STAFF")) {
+    return "You are signed in as an EEC admin. CCR&R staff data requires a CCR&R staff account.";
+  }
+
+  return "Your account does not have access to this resource";
+}
+
 export async function requireRole(
   allowedRoles: UserRole[],
 ): Promise<CurrentProfile> {
-  const profile = await getCurrentProfile();
+  let profile: CurrentProfile;
+
+  try {
+    profile = await getCurrentProfile();
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.code === "PROFILE_NOT_LINKED"
+    ) {
+      throw ApiError.forbidden(
+        "No profile is linked to this Clerk account. Run npm run account:link for your role.",
+        "PROFILE_NOT_LINKED",
+      );
+    }
+
+    throw error;
+  }
 
   if (!allowedRoles.includes(profile.role)) {
     throw ApiError.forbidden(
-      "Your account does not have access to this resource",
+      wrongRoleMessage(profile.role, allowedRoles),
+      "WRONG_ROLE",
     );
   }
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
+import { isSupportedLanguage } from "@/lib/languages";
 import { prisma } from "@/lib/db";
 import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 
@@ -23,6 +24,7 @@ const registrationSchema = z.object({
       ProviderType.UNKNOWN,
     ])
     .default(ProviderType.UNKNOWN),
+  preferredLanguage: z.string().min(2).max(10).optional(),
 });
 
 export async function POST(request: Request) {
@@ -43,6 +45,10 @@ export async function POST(request: Request) {
     const primaryEmail =
       clerkUser?.primaryEmailAddress?.emailAddress ?? body.data.contactEmail;
     const stateProviderId = body.data.stateProviderId?.trim();
+    const preferredLanguage =
+      body.data.preferredLanguage && isSupportedLanguage(body.data.preferredLanguage)
+        ? body.data.preferredLanguage
+        : undefined;
 
     const result = await prisma.$transaction(async (tx) => {
       const session = await tx.orientationSession.findUnique({
@@ -87,6 +93,7 @@ export async function POST(request: Request) {
           organizationName: body.data.organizationName,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          ...(preferredLanguage ? { preferredLanguage } : {}),
           ...(stateProviderId ? { stateProviderId } : {}),
         },
         create: {
@@ -99,6 +106,7 @@ export async function POST(request: Request) {
           organizationName: body.data.organizationName,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          preferredLanguage: preferredLanguage ?? "en",
           ...(stateProviderId ? { stateProviderId } : {}),
         },
       });
@@ -139,6 +147,7 @@ export async function POST(request: Request) {
           contactEmail: body.data.contactEmail,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          preferredLanguage: preferredLanguage ?? appUser.preferredLanguage,
           status: "REGISTERED",
           attendanceStatus: "NOT_MARKED",
         },

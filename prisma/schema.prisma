@@ -116,6 +116,7 @@ model OrientationSession {
   title        String
   description  String?
   region       String
+  language     String        @default("en")
   format       SessionFormat @default(VIRTUAL)
   status       SessionStatus @default(PUBLISHED)
   startsAt     DateTime      @map("startAt")
@@ -133,6 +134,7 @@ model OrientationSession {
 
   @@index([agencyId])
   @@index([region])
+  @@index([language])
   @@index([startsAt])
   @@index([format])
   @@map("OrientationSession")
@@ -165,11 +167,12 @@ model Registration {
   userId    String?
   user      AppUser?           @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  providerName     String
-  organizationName String           @map("organization")
-  contactEmail     String           @map("email")
-  phone            String?
-  providerType     String?
+  providerName       String
+  organizationName   String           @map("organization")
+  contactEmail       String           @map("email")
+  phone              String?
+  providerType       String?
+  preferredLanguage  String           @default("en")
   status           RegistrationStatus @default(REGISTERED)
   attendanceStatus AttendanceStatus   @default(NOT_MARKED)
   completedAt      DateTime?
@@ -185,5 +188,6 @@ model Registration {
   @@index([sessionId])
   @@index([status])
   @@index([attendanceStatus])
+  @@index([preferredLanguage])
   @@map("Registration")
 }
