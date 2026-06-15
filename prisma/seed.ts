@@ -570,11 +570,25 @@ async function main() {
     });
   }
 
+  const providerStateIds = Object.fromEntries(
+    providerUsers.map((provider) => [provider.id, provider.stateProviderId]),
+  );
+
   for (const registration of registrations) {
+    const stateProviderId = registration.userId
+      ? providerStateIds[registration.userId]
+      : undefined;
+
     await prisma.registration.upsert({
       where: { id: registration.id },
-      update: registration,
-      create: registration,
+      update: {
+        ...registration,
+        stateProviderId,
+      },
+      create: {
+        ...registration,
+        stateProviderId,
+      },
     });
   }
 

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
+import { PortalNotice } from "@/components/portal-notice";
+import { usePersonaGuard } from "@/hooks/use-persona-guard";
 
 type StaffSession = {
   id: string;
@@ -99,9 +101,12 @@ function SessionCard({ session }: { session: StaffSession }) {
 export default function CcrrPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+  const { isReady: portalReady, notice: portalNotice } = usePersonaGuard("ccrr");
   const [sessions, setSessions] = useState<StaffSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoaded && !userId) router.push("/sign-in");
@@ -141,19 +146,57 @@ export default function CcrrPage() {
     }
   }, [isLoaded, userId]);
 
-  if (!isLoaded || !userId) return null;
+  async function handleExport() {
+    setExporting(true);
+    setExportError(null);
+
+    try {
+      const res = await fetch("/api/ccrr/export");
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        setExportError(json?.error?.message ?? "Unable to export data.");
+        return;
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition");
+      const filename =
+        disposition?.match(/filename="(.+)"/)?.[1] ?? "ccrr-export.csv";
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError("Network error. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  if (!isLoaded || !userId || !portalReady) return null;
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       <PersonaNav basePath="/ccrr" subtitle="Welcome, CCR&R Staff" />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
+        <PortalNotice message={portalNotice} />
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2f5e]">Staff Dashboard</h1>
             <p className="mt-1 text-sm text-zinc-500 max-w-lg">Manage upcoming orientation sessions, track registration progress, and export agency attendance data for federal compliance.</p>
+            {exportError && (
+              <p className="mt-2 text-sm text-red-600">{exportError}</p>
+            )}
           </div>
-          <button className="flex items-center gap-2 border border-zinc-300 bg-white text-zinc-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-zinc-50 transition-colors">
-            ↓ Export All Data
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2 border border-zinc-300 bg-white text-zinc-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-zinc-50 transition-colors disabled:opacity-50"
+          >
+            {exporting ? "Exporting..." : "↓ Export All Data"}
           </button>
         </div>
         <section id="sessions">

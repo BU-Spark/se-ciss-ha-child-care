@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
+import { PortalNotice } from "@/components/portal-notice";
+import { usePersonaGuard } from "@/hooks/use-persona-guard";
 import { getLanguageLabel, SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -499,13 +501,25 @@ function SessionCard({ session, onRegister }: { session: Session; onRegister: (s
   );
 }
 
-function RegistrationRow({ registration }: { registration: ProviderRegistration }) {
+function RegistrationRow({
+  registration,
+  onCancel,
+  cancelling,
+}: {
+  registration: ProviderRegistration;
+  onCancel: (id: string) => void;
+  cancelling: boolean;
+}) {
   const { month, day } = formatDateLabel(registration.session.startsAt);
   const status = registrationStatusLabel(registration.status);
   const formatLabel = formatSessionFormat(
     registration.session.format,
     registration.session.locationName,
   );
+  const isFutureSession = new Date(registration.session.startsAt) > new Date();
+  const canCancel =
+    isFutureSession &&
+    (registration.status === "REGISTERED" || registration.status === "WAITLISTED");
 
   return (
     <div className="flex items-center justify-between py-3 border-b border-zinc-100 last:border-0">
@@ -523,7 +537,16 @@ function RegistrationRow({ registration }: { registration: ProviderRegistration 
       </div>
       <div className="flex items-center gap-3">
         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${status === "Confirmed" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>{status}</span>
-        <button className="text-xs text-red-500 hover:text-red-700 font-medium">Cancel Registration</button>
+        {canCancel && (
+          <button
+            type="button"
+            disabled={cancelling}
+            onClick={() => onCancel(registration.id)}
+            className="text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
+          >
+            {cancelling ? "Cancelling..." : "Cancel Registration"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -534,6 +557,7 @@ function RegistrationRow({ registration }: { registration: ProviderRegistration 
 export default function ProviderPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+  const { isReady: portalReady, notice: portalNotice } = usePersonaGuard("provider");
   const [region, setRegion] = useState("All Regions");
   const [regions, setRegions] = useState<string[]>([]);
   const [agency, setAgency] = useState("All Agencies");
@@ -550,30 +574,14 @@ export default function ProviderPage() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [registeredSession, setRegisteredSession] = useState<Session | null>(null);
   const [registrationsKey, setRegistrationsKey] = useState(0);
-  const [profileSource, setProfileSource] = useState<string | null>(null);
+  const [sessionsKey, setSessionsKey] = useState(0);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // Redirect if not logged in
   useEffect(() => {
     if (isLoaded && !userId) router.push("/sign-in");
   }, [isLoaded, userId, router]);
-
-  useEffect(() => {
-    async function fetchProfile() {
-      try {
-        const res = await fetch("/api/me");
-        const json = await res.json();
-        if (json.success) {
-          setProfileSource(json.data.profile.source);
-        }
-      } catch {
-        // Profile lookup is best-effort.
-      }
-    }
-
-    if (isLoaded && userId) {
-      fetchProfile();
-    }
-  }, [isLoaded, userId]);
 
   useEffect(() => {
     async function fetchFilterOptions() {
@@ -659,9 +667,33 @@ export default function ProviderPage() {
       }
     }
     fetchSessions();
-  }, [region, agency, language, format, dateRange]);
+  }, [region, agency, language, format, dateRange, sessionsKey]);
 
-  if (!isLoaded || !userId) return null;
+  async function handleCancelRegistration(registrationId: string) {
+    setCancellingId(registrationId);
+    setCancelError(null);
+
+    try {
+      const res = await fetch(`/api/registrations/${registrationId}/cancel`, {
+        method: "PATCH",
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setCancelError(json.error?.message ?? "Unable to cancel registration.");
+        return;
+      }
+
+      setRegistrationsKey((current) => current + 1);
+      setSessionsKey((current) => current + 1);
+    } catch {
+      setCancelError("Network error. Please try again.");
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  if (!isLoaded || !userId || !portalReady) return null;
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
@@ -676,6 +708,7 @@ export default function ProviderPage() {
             setRegisteredSession(selectedSession);
             setSelectedSession(null);
             setRegistrationsKey((current) => current + 1);
+            setSessionsKey((current) => current + 1);
           }}
         />
       )}
@@ -689,22 +722,10 @@ export default function ProviderPage() {
       )}
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
+        <PortalNotice message={portalNotice} />
         <div>
           <h1 className="text-2xl font-bold text-[#1a2f5e]">Orientation Dashboard</h1>
           <p className="mt-1 text-sm text-zinc-500">Register for upcoming orientation sessions required for Massachusetts child care providers. Browse available slots by agency, region, language, and format.</p>
-          {profileSource === "STAFF_USER" && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              You are signed in as staff. Provider registration is not available on this account.{" "}
-              <button
-                type="button"
-                onClick={() => router.push("/ccrr")}
-                className="font-medium underline hover:text-amber-950"
-              >
-                Go to the CCR&R staff dashboard
-              </button>
-              .
-            </div>
-          )}
         </div>
 
         {/* Filters */}
@@ -747,6 +768,9 @@ export default function ProviderPage() {
         {/* My Registrations */}
         <section className="border border-zinc-200 rounded-lg bg-white p-6">
           <h2 className="font-semibold text-zinc-800 mb-4">My Registrations</h2>
+          {cancelError && (
+            <p className="mb-3 text-sm text-red-600">{cancelError}</p>
+          )}
           {registrationsLoading ? (
             <p className="text-sm text-zinc-400 py-4 text-center">Loading registrations...</p>
           ) : registrationsError ? (
@@ -755,7 +779,12 @@ export default function ProviderPage() {
             <p className="text-sm text-zinc-400 py-4 text-center">You have not registered for any sessions yet.</p>
           ) : (
             registrations.map((registration) => (
-              <RegistrationRow key={registration.id} registration={registration} />
+              <RegistrationRow
+                key={registration.id}
+                registration={registration}
+                onCancel={handleCancelRegistration}
+                cancelling={cancellingId === registration.id}
+              />
             ))
           )}
         </section>

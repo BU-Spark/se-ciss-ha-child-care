@@ -138,6 +138,9 @@ export async function POST(request: Request) {
         throw ApiError.conflict("This session is full", "SESSION_FULL");
       }
 
+      const registrationStateProviderId =
+        stateProviderId ?? appUser.stateProviderId ?? undefined;
+
       const registration = await tx.registration.create({
         data: {
           sessionId: session.id,
@@ -147,6 +150,7 @@ export async function POST(request: Request) {
           contactEmail: body.data.contactEmail,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          stateProviderId: registrationStateProviderId,
           preferredLanguage: preferredLanguage ?? appUser.preferredLanguage,
           status: "REGISTERED",
           attendanceStatus: "NOT_MARKED",

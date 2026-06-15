@@ -5,11 +5,14 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
+import { PortalNotice } from "@/components/portal-notice";
+import { usePersonaGuard } from "@/hooks/use-persona-guard";
 
 type Provider = {
   id: string;
   name: string;
   email: string;
+  stateProviderId: string | null;
   registrationDate: string;
   attended: boolean;
   notes: string;
@@ -29,6 +32,7 @@ type ApiRegistration = {
   id: string;
   providerName: string;
   contactEmail: string;
+  stateProviderId: string | null;
   attendanceStatus: "NOT_MARKED" | "ATTENDED" | "NO_SHOW";
   notes: string | null;
   registeredAt: string;
@@ -107,6 +111,7 @@ function mapRegistration(registration: ApiRegistration): Provider {
     id: registration.id,
     name: registration.providerName,
     email: registration.contactEmail,
+    stateProviderId: registration.stateProviderId,
     registrationDate: formatRegistrationDate(registration.registeredAt),
     attended: registration.attendanceStatus === "ATTENDED",
     notes: registration.notes ?? "",
@@ -116,6 +121,7 @@ function mapRegistration(registration: ApiRegistration): Provider {
 export default function SessionDetailPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+  const { isReady: portalReady, notice: portalNotice } = usePersonaGuard("ccrr");
   const params = useParams();
   const sessionId = params.id as string;
 
@@ -260,7 +266,7 @@ export default function SessionDetailPage() {
     }
   }
 
-  if (!isLoaded || !userId) return null;
+  if (!isLoaded || !userId || !portalReady) return null;
 
   if (loading) {
     return (
@@ -288,6 +294,7 @@ export default function SessionDetailPage() {
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-6">
+        <PortalNotice message={portalNotice} />
 
         <div className="flex items-center gap-2 text-sm text-zinc-400">
           <button onClick={() => router.push("/ccrr")} className="hover:text-zinc-600 transition-colors">Dashboard</button>
@@ -329,7 +336,7 @@ export default function SessionDetailPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
-                {["Provider Name", "Email", "Registration Date", "Attended", "Notes"].map((h) => (
+                {["Provider Name", "Email", "PID", "Registration Date", "Attended", "Notes"].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -337,7 +344,7 @@ export default function SessionDetailPage() {
             <tbody>
               {providers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-zinc-400">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-zinc-400">
                     No registrations for this session yet.
                   </td>
                 </tr>
@@ -346,6 +353,7 @@ export default function SessionDetailPage() {
                   <tr key={provider.id} className="border-b border-zinc-50 hover:bg-zinc-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-zinc-800">{provider.name}</td>
                     <td className="px-4 py-3 text-zinc-500">{provider.email}</td>
+                    <td className="px-4 py-3 text-zinc-500 font-mono text-xs">{provider.stateProviderId ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-500">{provider.registrationDate}</td>
                     <td className="px-4 py-3">
                       <input

@@ -172,6 +172,7 @@ model Registration {
   contactEmail       String           @map("email")
   phone              String?
   providerType       String?
+  stateProviderId    String?
   preferredLanguage  String           @default("en")
   status           RegistrationStatus @default(REGISTERED)
   attendanceStatus AttendanceStatus   @default(NOT_MARKED)
@@ -189,5 +190,6 @@ model Registration {
   @@index([status])
   @@index([attendanceStatus])
   @@index([preferredLanguage])
+  @@index([stateProviderId])
   @@map("Registration")
 }

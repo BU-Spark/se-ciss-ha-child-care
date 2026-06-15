@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, UserButton } from "@clerk/nextjs";
 
+import { PortalNotice } from "@/components/portal-notice";
+import { usePersonaGuard } from "@/hooks/use-persona-guard";
+import { escapeCSV } from "@/lib/csv";
 import { getLanguageLabel } from "@/lib/languages";
 
 type Registration = {
@@ -54,14 +57,10 @@ function formatSessionDate(iso: string) {
   });
 }
 
-function escapeCSV(val: string) {
-  const safe = /^[=+\-@]/.test(val) ? `'${val}` : val;
-  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
-
 export default function EecPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+  const { isReady: portalReady, notice: portalNotice } = usePersonaGuard("eec");
   const [activeNav, setActiveNav] = useState("Overview");
   const [agency, setAgency] = useState("All Agencies");
   const [region, setRegion] = useState("All Regions");
@@ -203,7 +202,7 @@ export default function EecPage() {
     setTimeout(() => URL.revokeObjectURL(url), 100);
   }
 
-  if (!isLoaded || !userId) return null;
+  if (!isLoaded || !userId || !portalReady) return null;
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
@@ -257,6 +256,7 @@ export default function EecPage() {
           </div>
         </aside>
         <main className="flex-1 px-6 py-6 flex flex-col gap-6 overflow-auto">
+          <PortalNotice message={portalNotice} />
           <h1 className="text-xl font-bold text-[#1a2f5e]">EEC Orientation – Administrator</h1>
 
           <div className="grid grid-cols-4 gap-4">
