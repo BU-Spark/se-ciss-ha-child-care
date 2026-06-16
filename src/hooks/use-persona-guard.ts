@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 
 import {
   canAccessPortal,
@@ -15,10 +16,18 @@ type MeProfile = {
   role: "PROVIDER" | "CCRR_STAFF" | "EEC_ADMIN";
 };
 
+const portalLabels: Record<PortalId, string> = {
+  provider: "Child Care Provider",
+  ccrr: "CCR&R Staff",
+  eec: "EEC Administrator",
+};
+
 export function usePersonaGuard(portal: PortalId) {
   const router = useRouter();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const [isReady, setIsReady] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [setupMessage, setSetupMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -32,13 +41,38 @@ export function usePersonaGuard(portal: PortalId) {
   }, []);
 
   useEffect(() => {
+    if (!authLoaded) {
+      return;
+    }
+
+    if (!isSignedIn) {
+      router.push(`/sign-in?redirect_url=${encodeURIComponent(portalPath(portal))}`);
+      return;
+    }
+
     async function verifyPortal() {
       try {
-        const res = await fetch("/api/me");
+        const meUrl =
+          portal === "provider" ? "/api/me?autoProvision=provider" : "/api/me";
+        const res = await fetch(meUrl);
         const json = await res.json();
 
+        if (res.status === 401) {
+          router.push(`/sign-in?redirect_url=${encodeURIComponent(portalPath(portal))}`);
+          return;
+        }
+
         if (!res.ok || !json.success) {
-          router.push("/sign-in");
+          if (json.error?.code === "PROFILE_NOT_LINKED") {
+            setSetupMessage(json.error.message);
+            setIsReady(true);
+            return;
+          }
+
+          setSetupMessage(
+            json.error?.message ?? "Unable to load your account profile.",
+          );
+          setIsReady(true);
           return;
         }
 
@@ -46,12 +80,7 @@ export function usePersonaGuard(portal: PortalId) {
 
         if (!canAccessPortal(profile, portal)) {
           const home = homePortalForProfile(profile);
-          const labels: Record<PortalId, string> = {
-            provider: "Child Care Provider",
-            ccrr: "CCR&R Staff",
-            eec: "EEC Administrator",
-          };
-          const message = `This area is for ${labels[portal]}. Taking you to the ${labels[home]} portal instead.`;
+          const message = `This area is for ${portalLabels[portal]}. Taking you to the ${portalLabels[home]} portal instead.`;
           router.replace(
             `${portalPath(home)}?portalNotice=${encodeURIComponent(message)}`,
           );
@@ -60,12 +89,21 @@ export function usePersonaGuard(portal: PortalId) {
 
         setIsReady(true);
       } catch {
-        router.push("/sign-in");
+        setSetupMessage("Network error. Please refresh and try again.");
+        setIsReady(true);
       }
     }
 
     verifyPortal();
-  }, [portal, router]);
+  }, [authLoaded, isSignedIn, portal, router]);
 
-  return { isReady, notice };
+  const canLoadData = authLoaded && isSignedIn && isReady && !setupMessage;
+
+  return {
+    isReady,
+    notice,
+    setupMessage,
+    portalLabel: portalLabels[portal],
+    canLoadData,
+  };
 }

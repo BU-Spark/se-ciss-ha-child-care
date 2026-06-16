@@ -91,6 +91,83 @@ export async function GET() {
       };
     });
 
+    const agenciesWithStats = await prisma.agency.findMany({
+      where: { isActive: true },
+      include: {
+        sessions: {
+          where: { status: "PUBLISHED" },
+          include: {
+            registrations: {
+              where: activeRegistrationStatusFilter,
+              select: { status: true },
+            },
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const agencyCompliance = agenciesWithStats.map((entry) => {
+      const sessionRegistrations = entry.sessions.flatMap(
+        (session) => session.registrations,
+      );
+      const completions = sessionRegistrations.filter(
+        (registration) => registration.status === "ATTENDED",
+      ).length;
+
+      return {
+        agency: entry.name,
+        region: entry.region,
+        sessions: entry.sessions.length,
+        registrations: sessionRegistrations.length,
+        completions,
+        completionRate:
+          sessionRegistrations.length > 0
+            ? Math.round((completions / sessionRegistrations.length) * 100)
+            : 0,
+      };
+    });
+
+    const recentActivity = await prisma.registration.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 30,
+      select: {
+        id: true,
+        providerName: true,
+        status: true,
+        attendanceStatus: true,
+        createdAt: true,
+        updatedAt: true,
+        session: {
+          select: {
+            title: true,
+            agency: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    const auditLogs = recentActivity.map((entry) => {
+      const isNew = entry.createdAt.getTime() === entry.updatedAt.getTime();
+      let action = "Registration updated";
+
+      if (isNew) {
+        action = "Registration created";
+      } else if (entry.status === "ATTENDED" || entry.attendanceStatus === "ATTENDED") {
+        action = "Attendance marked";
+      } else if (entry.status === "CANCELLED") {
+        action = "Registration cancelled";
+      }
+
+      return {
+        id: entry.id,
+        timestamp: entry.updatedAt.toISOString(),
+        action,
+        detail: `${entry.providerName} — ${entry.session.title}`,
+        agency: entry.session.agency.name,
+      };
+    });
+
     return jsonSuccess({
       stats: {
         totalRegistrations,
@@ -102,6 +179,8 @@ export async function GET() {
       },
       regionalCompletion,
       registrationsOverTime,
+      agencyCompliance,
+      auditLogs,
       filterOptions: {
         agencies: ["All Agencies", ...agencies.map((agency) => agency.name)],
         regions: [

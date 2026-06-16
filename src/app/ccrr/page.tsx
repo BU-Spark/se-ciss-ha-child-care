@@ -6,6 +6,7 @@ import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
 import { PortalNotice } from "@/components/portal-notice";
+import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
 
 type StaffSession = {
@@ -100,22 +101,19 @@ function SessionCard({ session }: { session: StaffSession }) {
 
 export default function CcrrPage() {
   const { isLoaded, userId } = useAuth();
-  const router = useRouter();
-  const { isReady: portalReady, notice: portalNotice } = usePersonaGuard("ccrr");
+  const { isReady: portalReady, notice: portalNotice, setupMessage, portalLabel, canLoadData } = usePersonaGuard("ccrr");
   const [sessions, setSessions] = useState<StaffSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isLoaded && !userId) router.push("/sign-in");
-  }, [isLoaded, userId, router]);
 
   useEffect(() => {
     async function fetchSessions() {
       setLoading(true);
       setError(null);
+      setErrorCode(null);
 
       try {
         const res = await fetch("/api/ccrr/sessions");
@@ -123,6 +121,7 @@ export default function CcrrPage() {
 
         if (!res.ok || !json.success) {
           setError(json.error?.message ?? "Unable to load sessions.");
+          setErrorCode(json.error?.code ?? null);
           setSessions([]);
           return;
         }
@@ -141,10 +140,10 @@ export default function CcrrPage() {
       }
     }
 
-    if (isLoaded && userId) {
+    if (canLoadData) {
       fetchSessions();
     }
-  }, [isLoaded, userId]);
+  }, [canLoadData]);
 
   async function handleExport() {
     setExporting(true);
@@ -175,9 +174,15 @@ export default function CcrrPage() {
     }
   }
 
-  if (!isLoaded || !userId || !portalReady) return null;
+  if (!isLoaded || !userId) return null;
 
   return (
+    <PersonaGuardBoundary
+      portal="ccrr"
+      isReady={portalReady}
+      setupMessage={setupMessage}
+      portalLabel={portalLabel}
+    >
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       <PersonaNav basePath="/ccrr" subtitle="Welcome, CCR&R Staff" />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
@@ -200,6 +205,14 @@ export default function CcrrPage() {
           </button>
         </div>
         <section id="sessions">
+          <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-zinc-700">
+            <p className="font-medium text-[#1a2f5e]">How sessions work</p>
+            <p className="mt-1">
+              <strong>Providers</strong> register themselves on the Provider portal.
+              <strong> CCR&amp;R staff</strong> manage attendance and export data here — you do not register as a provider.
+              Sessions are published by your agency (demo data is pre-loaded in the database).
+            </p>
+          </div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-zinc-800">Upcoming Sessions</h2>
             <span className="text-sm text-zinc-500">
@@ -209,15 +222,16 @@ export default function CcrrPage() {
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <p className="font-medium text-red-800">{error}</p>
-              <p className="mt-2 text-red-700">
-                In your project folder, run:
-              </p>
-              <code className="mt-1 block rounded bg-red-100 px-2 py-1 text-xs text-red-900">
-                npm run account:link -- ccrr YOUR_CLERK_USER_ID seed-agency-boston staff.boston@example.com &quot;Boston CCR&amp;R Staff&quot;
-              </code>
-              <p className="mt-2 text-red-700">
-                Replace <span className="font-mono">YOUR_CLERK_USER_ID</span> with your ID from the Clerk dashboard, then refresh this page.
-              </p>
+              {errorCode === "PROFILE_NOT_LINKED" && (
+                <>
+                  <p className="mt-2 text-red-700">
+                    Sign in with your CCR&amp;R staff email, or run:
+                  </p>
+                  <code className="mt-1 block rounded bg-red-100 px-2 py-1 text-xs text-red-900">
+                    npm run account:link -- ccrr YOUR_CLERK_USER_ID seed-agency-boston deeppatel0306@gmail.com
+                  </code>
+                </>
+              )}
             </div>
           )}
           {loading ? (
@@ -249,5 +263,6 @@ export default function CcrrPage() {
         </div>
       </footer>
     </div>
+    </PersonaGuardBoundary>
   );
 }

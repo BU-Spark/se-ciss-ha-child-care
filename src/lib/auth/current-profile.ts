@@ -4,6 +4,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import type { AppUser, StaffUser, UserRole } from "@prisma/client";
 
 import { ApiError } from "@/lib/api/errors";
+import { linkAppUserForClerk, linkStaffUserForClerk } from "@/lib/auth/link-app-user";
 import { prisma } from "@/lib/db";
 
 type AgencySummary = {
@@ -86,13 +87,83 @@ export async function getCurrentProfile(): Promise<CurrentProfile> {
     };
   }
 
+  const clerkUser = await currentUser();
+  const email = clerkUser?.primaryEmailAddress?.emailAddress;
+
+  if (email) {
+    const linkedStaff = await prisma.staffUser.findUnique({
+      where: { email },
+      include: {
+        agency: {
+          select: {
+            id: true,
+            name: true,
+            region: true,
+          },
+        },
+      },
+    });
+
+    if (
+      linkedStaff &&
+      (!linkedStaff.clerkUserId || linkedStaff.clerkUserId === userId)
+    ) {
+      const staffUser = linkedStaff.clerkUserId
+        ? linkedStaff
+        : await prisma.$transaction(async (tx) => {
+            await tx.appUser.deleteMany({ where: { clerkUserId: userId } });
+
+            return linkStaffUserForClerk(tx, {
+              clerkUserId: userId,
+              email,
+              name: linkedStaff.name,
+            });
+          });
+
+      if (staffUser) {
+        return {
+          source: "STAFF_USER",
+          role: staffUser.role,
+          agencyId: staffUser.agencyId,
+          user: staffUser,
+        };
+      }
+    }
+
+    const linkedAppUser = await linkAppUserForClerk(prisma, {
+      clerkUserId: userId,
+      email,
+      firstName: clerkUser?.firstName,
+      lastName: clerkUser?.lastName,
+      createIfMissing: false,
+    }).catch((error) => {
+      if (
+        error instanceof ApiError &&
+        error.code === "EMAIL_ALREADY_LINKED"
+      ) {
+        return null;
+      }
+
+      throw error;
+    });
+
+    if (linkedAppUser) {
+      return {
+        source: "APP_USER",
+        role: linkedAppUser.role,
+        agencyId: linkedAppUser.agencyId,
+        user: linkedAppUser,
+      };
+    }
+  }
+
   throw ApiError.forbidden(
     "No profile is linked to this Clerk account. Run npm run account:link for your role.",
     "PROFILE_NOT_LINKED",
   );
 }
 
-async function provisionProviderProfile(): Promise<CurrentProfile> {
+export async function provisionProviderProfile(): Promise<CurrentProfile> {
   const { userId } = await auth();
 
   if (!userId) {
@@ -114,30 +185,23 @@ async function provisionProviderProfile(): Promise<CurrentProfile> {
     );
   }
 
-  const provisionedUser = await prisma.appUser.upsert({
-    where: { clerkUserId: userId },
-    update: {
-      email,
-      firstName: clerkUser.firstName,
-      lastName: clerkUser.lastName,
-    },
-    create: {
+  const provisionedUser = await prisma.$transaction(async (tx) => {
+    await tx.staffUser.deleteMany({ where: { clerkUserId: userId } });
+
+    return linkAppUserForClerk(tx, {
       clerkUserId: userId,
       email,
       firstName: clerkUser.firstName,
       lastName: clerkUser.lastName,
-      role: "PROVIDER",
-    },
-    include: {
-      agency: {
-        select: {
-          id: true,
-          name: true,
-          region: true,
-        },
-      },
-    },
+    });
   });
+
+  if (!provisionedUser) {
+    throw ApiError.badRequest(
+      "Unable to provision provider profile",
+      "PROFILE_CREATE_FAILED",
+    );
+  }
 
   return {
     source: "APP_USER",

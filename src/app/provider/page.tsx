@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
 import { PortalNotice } from "@/components/portal-notice";
+import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
 import { getLanguageLabel, SUPPORTED_LANGUAGES } from "@/lib/languages";
 
@@ -99,12 +100,20 @@ function formatSessionFormat(
   return locationName ? `In-person (${locationName})` : "In-person";
 }
 
-function registrationStatusLabel(status: string): "Confirmed" | "Pending" {
-  if (status === "WAITLISTED") {
-    return "Pending";
-  }
-
+function registrationStatusLabel(status: string) {
+  if (status === "WAITLISTED") return "Pending";
+  if (status === "ATTENDED") return "Attended";
+  if (status === "NO_SHOW") return "No-show";
+  if (status === "CANCELLED") return "Cancelled";
   return "Confirmed";
+}
+
+function registrationStatusClass(status: string) {
+  if (status === "ATTENDED") return "bg-green-50 text-green-700";
+  if (status === "NO_SHOW") return "bg-red-50 text-red-600";
+  if (status === "WAITLISTED") return "bg-yellow-50 text-yellow-700";
+  if (status === "CANCELLED") return "bg-zinc-100 text-zinc-500";
+  return "bg-green-50 text-green-700";
 }
 
 function getDateRangeParams(dateRange: string) {
@@ -329,7 +338,7 @@ function RegistrationModal({
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) {
+      if (!res.ok || !json.success) {
         setError(json.error?.message ?? "Something went wrong. Please try again.");
         return;
       }
@@ -405,7 +414,7 @@ function RegistrationModal({
             {/* Auto confirmation notice */}
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 flex gap-2">
               <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
-              <p className="text-xs text-blue-700">Upon clicking Complete Registration, a confirmation email will be sent to the provided contact address containing the full session agenda and secure Zoom meeting link.</p>
+              <p className="text-xs text-blue-700">After you register, session details will appear in My Registrations below.</p>
             </div>
 
             {/* Error */}
@@ -460,7 +469,13 @@ function SuccessModal({ session, onClose }: { session: Session; onClose: () => v
           <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
         </div>
         <h2 className="text-xl font-bold text-zinc-800">You&apos;re registered!</h2>
-        <p className="text-sm text-zinc-500">You&apos;ve successfully registered for <span className="font-medium text-zinc-700">{session.title}</span>. A confirmation email has been sent to you.</p>
+        <p className="text-sm text-zinc-500">
+          You&apos;ve successfully registered for{" "}
+          <span className="font-medium text-zinc-700">{session.title}</span>.
+          {session.format === "VIRTUAL" && session.meetingUrl ? (
+            <> Join via: <span className="font-mono text-xs">{session.meetingUrl}</span></>
+          ) : null}
+        </p>
         <button onClick={onClose} className="mt-2 bg-[#1a2f5e] text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors">Done</button>
       </div>
     </div>
@@ -469,15 +484,29 @@ function SuccessModal({ session, onClose }: { session: Session; onClose: () => v
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function SessionCard({ session, onRegister }: { session: Session; onRegister: (s: Session) => void }) {
+function SessionCard({
+  session,
+  isRegistered,
+  onRegister,
+}: {
+  session: Session;
+  isRegistered: boolean;
+  onRegister: (s: Session) => void;
+}) {
   const urgent = session.spotsLeft !== null && session.spotsLeft <= 3;
+  const isFull = session.spotsLeft !== null && session.spotsLeft <= 0;
   const formatDetail = session.format === "VIRTUAL" ? "Virtual – via Zoom" : session.locationName ?? "In-person";
+  const disabled = isRegistered || isFull;
 
   return (
     <div className="border border-zinc-200 rounded-lg bg-white p-5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded">{session.region}</span>
-        {urgent ? (
+        {isRegistered ? (
+          <span className="text-xs font-semibold text-green-700">Registered</span>
+        ) : isFull ? (
+          <span className="text-xs font-semibold text-red-600">Full</span>
+        ) : urgent ? (
           <span className="text-xs font-semibold text-orange-600">⚠ ONLY {session.spotsLeft} SPOTS LEFT</span>
         ) : (
           <span className="text-xs text-zinc-500">{session.spotsLeft ?? "Unlimited"} spots left</span>
@@ -492,10 +521,12 @@ function SessionCard({ session, onRegister }: { session: Session; onRegister: (s
         <span>{formatDetail}</span>
       </div>
       <button
+        type="button"
+        disabled={disabled}
         onClick={() => onRegister(session)}
-        className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors mt-1"
+        className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Register
+        {isRegistered ? "Already registered" : isFull ? "Session full" : "Register"}
       </button>
     </div>
   );
@@ -536,7 +567,7 @@ function RegistrationRow({
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${status === "Confirmed" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>{status}</span>
+        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${registrationStatusClass(registration.status)}`}>{status}</span>
         {canCancel && (
           <button
             type="button"
@@ -557,7 +588,7 @@ function RegistrationRow({
 export default function ProviderPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
-  const { isReady: portalReady, notice: portalNotice } = usePersonaGuard("provider");
+  const { isReady: portalReady, notice: portalNotice, setupMessage, portalLabel, canLoadData } = usePersonaGuard("provider");
   const [region, setRegion] = useState("All Regions");
   const [regions, setRegions] = useState<string[]>([]);
   const [agency, setAgency] = useState("All Agencies");
@@ -578,10 +609,10 @@ export default function ProviderPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  // Redirect if not logged in
-  useEffect(() => {
-    if (isLoaded && !userId) router.push("/sign-in");
-  }, [isLoaded, userId, router]);
+  const registeredSessionIds = useMemo(
+    () => new Set(registrations.map((registration) => registration.session.id)),
+    [registrations],
+  );
 
   useEffect(() => {
     async function fetchFilterOptions() {
@@ -630,10 +661,10 @@ export default function ProviderPage() {
       }
     }
 
-    if (isLoaded && userId) {
+    if (canLoadData) {
       fetchRegistrations();
     }
-  }, [isLoaded, userId, registrationsKey]);
+  }, [canLoadData, registrationsKey]);
 
   // Fetch real sessions from API whenever filters change
   useEffect(() => {
@@ -666,8 +697,10 @@ export default function ProviderPage() {
         setLoading(false);
       }
     }
-    fetchSessions();
-  }, [region, agency, language, format, dateRange, sessionsKey]);
+    if (canLoadData) {
+      fetchSessions();
+    }
+  }, [canLoadData, region, agency, language, format, dateRange, sessionsKey]);
 
   async function handleCancelRegistration(registrationId: string) {
     setCancellingId(registrationId);
@@ -693,9 +726,15 @@ export default function ProviderPage() {
     }
   }
 
-  if (!isLoaded || !userId || !portalReady) return null;
+  if (!isLoaded || !userId) return null;
 
   return (
+    <PersonaGuardBoundary
+      portal="provider"
+      isReady={portalReady}
+      setupMessage={setupMessage}
+      portalLabel={portalLabel}
+    >
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       <PersonaNav basePath="/provider" />
 
@@ -760,7 +799,14 @@ export default function ProviderPage() {
             <div className="text-sm text-zinc-400 py-12 text-center">No sessions found for the selected filters.</div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sessions.map((s) => <SessionCard key={s.id} session={s} onRegister={setSelectedSession} />)}
+              {sessions.map((s) => (
+                <SessionCard
+                  key={s.id}
+                  session={s}
+                  isRegistered={registeredSessionIds.has(s.id)}
+                  onRegister={setSelectedSession}
+                />
+              ))}
             </div>
           )}
         </section>
@@ -807,5 +853,6 @@ export default function ProviderPage() {
         </div>
       </footer>
     </div>
+    </PersonaGuardBoundary>
   );
 }

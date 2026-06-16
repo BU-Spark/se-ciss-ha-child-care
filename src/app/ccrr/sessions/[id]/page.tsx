@@ -6,6 +6,7 @@ import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
 import { PortalNotice } from "@/components/portal-notice";
+import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
 
 type Provider = {
@@ -14,7 +15,7 @@ type Provider = {
   email: string;
   stateProviderId: string | null;
   registrationDate: string;
-  attended: boolean;
+  attendanceStatus: "NOT_MARKED" | "ATTENDED" | "NO_SHOW";
   notes: string;
 };
 
@@ -113,7 +114,7 @@ function mapRegistration(registration: ApiRegistration): Provider {
     email: registration.contactEmail,
     stateProviderId: registration.stateProviderId,
     registrationDate: formatRegistrationDate(registration.registeredAt),
-    attended: registration.attendanceStatus === "ATTENDED",
+    attendanceStatus: registration.attendanceStatus,
     notes: registration.notes ?? "",
   };
 }
@@ -121,7 +122,7 @@ function mapRegistration(registration: ApiRegistration): Provider {
 export default function SessionDetailPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
-  const { isReady: portalReady, notice: portalNotice } = usePersonaGuard("ccrr");
+  const { isReady: portalReady, notice: portalNotice, setupMessage, portalLabel, canLoadData } = usePersonaGuard("ccrr");
   const params = useParams();
   const sessionId = params.id as string;
 
@@ -135,8 +136,10 @@ export default function SessionDetailPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isLoaded && !userId) router.push("/sign-in");
-  }, [isLoaded, userId, router]);
+    if (isLoaded && !userId) {
+      router.push(`/sign-in?redirect_url=${encodeURIComponent(`/ccrr/sessions/${sessionId}`)}`);
+    }
+  }, [isLoaded, userId, router, sessionId]);
 
   useEffect(() => {
     async function fetchSession() {
@@ -176,14 +179,17 @@ export default function SessionDetailPage() {
       }
     }
 
-    if (isLoaded && userId && sessionId) {
+    if (canLoadData && sessionId) {
       fetchSession();
     }
-  }, [isLoaded, userId, sessionId, router]);
+  }, [canLoadData, sessionId, router]);
 
-  function toggleAttended(id: string) {
+  function setAttendanceStatus(
+    id: string,
+    attendanceStatus: Provider["attendanceStatus"],
+  ) {
     setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, attended: !p.attended } : p)),
+      prev.map((p) => (p.id === id ? { ...p, attendanceStatus } : p)),
     );
     setSaved(false);
     setSaveError(null);
@@ -197,16 +203,11 @@ export default function SessionDetailPage() {
     setSaveError(null);
   }
 
-  function getAttendanceStatus(provider: Provider, initial: Provider) {
-    if (provider.attended) {
-      return "ATTENDED";
-    }
-
-    if (initial.attended) {
-      return "NO_SHOW";
-    }
-
-    return "NOT_MARKED";
+  function providerChanged(provider: Provider, initial: Provider) {
+    return (
+      provider.attendanceStatus !== initial.attendanceStatus ||
+      provider.notes.trim() !== initial.notes.trim()
+    );
   }
 
   async function handleMarkAttendance() {
@@ -215,14 +216,7 @@ export default function SessionDetailPage() {
 
     const changedProviders = providers.filter((provider) => {
       const initial = initialProviders.find((entry) => entry.id === provider.id);
-      if (!initial) {
-        return false;
-      }
-
-      return (
-        provider.attended !== initial.attended ||
-        provider.notes.trim() !== initial.notes.trim()
-      );
+      return initial ? providerChanged(provider, initial) : false;
     });
 
     if (changedProviders.length === 0) {
@@ -232,28 +226,21 @@ export default function SessionDetailPage() {
     }
 
     try {
-      await Promise.all(
-        changedProviders.map(async (provider) => {
-          const initial = initialProviders.find((entry) => entry.id === provider.id);
-          if (!initial) {
-            return;
-          }
+      for (const provider of changedProviders) {
+        const res = await fetch(`/api/registrations/${provider.id}/attendance`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            attendanceStatus: provider.attendanceStatus,
+            notes: provider.notes.trim() || null,
+          }),
+        });
+        const json = await res.json();
 
-          const res = await fetch(`/api/registrations/${provider.id}/attendance`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              attendanceStatus: getAttendanceStatus(provider, initial),
-              notes: provider.notes.trim() || null,
-            }),
-          });
-          const json = await res.json();
-
-          if (!res.ok || !json.success) {
-            throw new Error(json.error?.message ?? "Failed to save attendance.");
-          }
-        }),
-      );
+        if (!res.ok || !json.success) {
+          throw new Error(json.error?.message ?? "Failed to save attendance.");
+        }
+      }
 
       setInitialProviders(providers);
       setSaved(true);
@@ -266,31 +253,30 @@ export default function SessionDetailPage() {
     }
   }
 
-  if (!isLoaded || !userId || !portalReady) return null;
+  if (!isLoaded || !userId) return null;
 
-  if (loading) {
-    return (
+  return (
+    <PersonaGuardBoundary
+      portal="ccrr"
+      isReady={portalReady}
+      setupMessage={setupMessage}
+      portalLabel={portalLabel}
+    >
+  {loading ? (
       <div className="min-h-screen bg-zinc-50 flex flex-col">
         <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
         <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
           <p className="text-sm text-zinc-400 py-12 text-center">Loading session...</p>
         </main>
       </div>
-    );
-  }
-
-  if (!session) {
-    return (
+  ) : !session ? (
       <div className="min-h-screen bg-zinc-50 flex flex-col">
         <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
         <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
           <p className="text-sm text-red-600 py-12 text-center">{error ?? "Session not found."}</p>
         </main>
       </div>
-    );
-  }
-
-  return (
+  ) : (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-6">
@@ -336,7 +322,7 @@ export default function SessionDetailPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
-                {["Provider Name", "Email", "PID", "Registration Date", "Attended", "Notes"].map((h) => (
+                {["Provider Name", "Email", "PID", "Registration Date", "Attendance", "Notes"].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -356,12 +342,20 @@ export default function SessionDetailPage() {
                     <td className="px-4 py-3 text-zinc-500 font-mono text-xs">{provider.stateProviderId ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-500">{provider.registrationDate}</td>
                     <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={provider.attended}
-                        onChange={() => toggleAttended(provider.id)}
-                        className="w-4 h-4 rounded border-zinc-300 accent-[#1a2f5e] cursor-pointer"
-                      />
+                      <select
+                        value={provider.attendanceStatus}
+                        onChange={(e) =>
+                          setAttendanceStatus(
+                            provider.id,
+                            e.target.value as Provider["attendanceStatus"],
+                          )
+                        }
+                        className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e]"
+                      >
+                        <option value="NOT_MARKED">Not marked</option>
+                        <option value="ATTENDED">Attended</option>
+                        <option value="NO_SHOW">No-show</option>
+                      </select>
                     </td>
                     <td className="px-4 py-3">
                       <input
@@ -392,11 +386,8 @@ export default function SessionDetailPage() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 border border-zinc-300 bg-white text-zinc-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-zinc-50 transition-colors">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-              Send Follow-up Email
-            </button>
             <button
+              type="button"
               onClick={handleMarkAttendance}
               disabled={saving || providers.length === 0}
               className="flex items-center gap-2 bg-[#1a2f5e] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors disabled:opacity-50"
@@ -423,5 +414,7 @@ export default function SessionDetailPage() {
         </div>
       </footer>
     </div>
+  )}
+    </PersonaGuardBoundary>
   );
 }

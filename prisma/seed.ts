@@ -67,8 +67,8 @@ const sessions = [
     description: "Introductory orientation for new family child care providers.",
     region: "Boston",
     format: SessionFormat.VIRTUAL,
-    startsAt: new Date("2026-06-09T14:00:00.000Z"),
-    endsAt: new Date("2026-06-09T16:00:00.000Z"),
+    startsAt: new Date("2026-06-20T14:00:00.000Z"),
+    endsAt: new Date("2026-06-20T16:00:00.000Z"),
     capacity: 30,
     meetingUrl: "https://example.com/zoom/boston-orientation",
     language: "es",
@@ -80,10 +80,23 @@ const sessions = [
     description: "In-person session covering licensing steps and required documents.",
     region: "Boston",
     format: SessionFormat.IN_PERSON,
-    startsAt: new Date("2026-06-16T13:00:00.000Z"),
-    endsAt: new Date("2026-06-16T16:00:00.000Z"),
+    startsAt: new Date("2026-06-27T13:00:00.000Z"),
+    endsAt: new Date("2026-06-27T16:00:00.000Z"),
     capacity: 25,
     locationName: "100 Cambridge Street, Boston, MA",
+    language: "en",
+  },
+  {
+    id: "seed-session-boston-summer",
+    agencyId: "seed-agency-boston",
+    title: "Summer Health & Safety Refresher",
+    description: "Required annual health and safety training for Boston-area providers.",
+    region: "Boston",
+    format: SessionFormat.VIRTUAL,
+    startsAt: new Date("2026-07-10T15:00:00.000Z"),
+    endsAt: new Date("2026-07-10T17:00:00.000Z"),
+    capacity: 40,
+    meetingUrl: "https://example.com/zoom/boston-summer",
     language: "en",
   },
   {
@@ -240,8 +253,8 @@ const staffUsers = [
   },
   {
     id: "seed-staff-boston",
-    email: "staff.boston@example.com",
-    name: "Boston CCR&R Staff",
+    email: "deeppatel0306@gmail.com",
+    name: "Deep Patel",
     role: UserRole.CCRR_STAFF,
     agencyId: "seed-agency-boston",
     clerkUserId: process.env.SEED_BOSTON_RESOURCE_CLERK_USER_ID ?? null,
@@ -256,8 +269,8 @@ const staffUsers = [
   },
   {
     id: "seed-staff-omar",
-    email: "omar.admin@example.com",
-    name: "Omar EEC Admin",
+    email: "deepp03@bu.edu",
+    name: "Deep Patel",
     role: UserRole.EEC_ADMIN,
     agencyId: null,
     clerkUserId: process.env.SEED_OMAR_EEC_CLERK_USER_ID ?? null,
@@ -268,15 +281,15 @@ const providerUsers = [
   {
     id: "appuser-maria-rodriguez",
     clerkUserId: "seed-provider-maria-rodriguez",
-    email: "m.rodriguez@example.com",
-    firstName: "Maria",
-    lastName: "Rodriguez",
-    providerName: "Maria Rodriguez",
+    email: "deep.patel.0603@gmail.com",
+    firstName: "Deep",
+    lastName: "Patel",
+    providerName: "Deep Patel",
     organizationName: "Little Learners Child Care Center",
     providerType: ProviderType.CENTER_BASED,
     stateProviderId: "PID-100112",
     phone: "(555) 010-0001",
-    preferredLanguage: "es",
+    preferredLanguage: "en",
   },
   {
     id: "appuser-james-chen",
@@ -383,9 +396,9 @@ const registrations = [
     id: "registration-maria-eec-june-14",
     sessionId: "session-eec-orientation-2026-06-14",
     userId: "appuser-maria-rodriguez",
-    providerName: "Maria Rodriguez",
+    providerName: "Deep Patel",
     organizationName: "Little Learners Child Care Center",
-    contactEmail: "m.rodriguez@example.com",
+    contactEmail: "deep.patel.0603@gmail.com",
     phone: "(555) 010-0001",
     providerType: ProviderType.CENTER_BASED,
     status: RegistrationStatus.REGISTERED,
@@ -479,7 +492,8 @@ const registrations = [
     providerType: ProviderType.CENTER_BASED,
     status: RegistrationStatus.REGISTERED,
     attendanceStatus: AttendanceStatus.NOT_MARKED,
-    notes: null,
+    preferredLanguage: "en",
+    notes: "First-time applicant",
     createdAt: new Date("2026-06-03T10:00:00.000Z"),
   },
   {
@@ -491,11 +505,10 @@ const registrations = [
     contactEmail: "r.kim@brightbeginnings.org",
     phone: "(555) 010-0008",
     providerType: ProviderType.CENTER_BASED,
-    status: RegistrationStatus.ATTENDED,
-    attendanceStatus: AttendanceStatus.ATTENDED,
+    status: RegistrationStatus.REGISTERED,
+    attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "en",
     notes: "Brought all required licensing documents",
-    checkedInAt: new Date("2026-06-16T12:55:00.000Z"),
-    completedAt: new Date("2026-06-16T16:00:00.000Z"),
     createdAt: new Date("2026-06-06T14:30:00.000Z"),
   },
   {
@@ -509,12 +522,122 @@ const registrations = [
     providerType: ProviderType.FAMILY_CHILD_CARE,
     status: RegistrationStatus.REGISTERED,
     attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "es",
     notes: null,
     createdAt: new Date("2026-06-10T09:15:00.000Z"),
+  },
+  {
+    id: "registration-james-boston-virtual-june-20",
+    sessionId: "seed-session-boston-virtual",
+    userId: "appuser-james-chen",
+    providerName: "James Chen",
+    organizationName: "Bright Futures Family Child Care",
+    contactEmail: "j.chen@daycare.org",
+    phone: "(555) 010-0002",
+    providerType: ProviderType.FAMILY_CHILD_CARE,
+    status: RegistrationStatus.REGISTERED,
+    attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "zh",
+    notes: null,
+    createdAt: new Date("2026-06-08T11:00:00.000Z"),
+  },
+  {
+    id: "registration-althea-boston-virtual-june-20",
+    sessionId: "seed-session-boston-virtual",
+    userId: "appuser-althea-jenkins",
+    providerName: "Althea Jenkins",
+    organizationName: "Northeast Neighborhood Child Care",
+    contactEmail: "ajenkins@provider.net",
+    phone: "(555) 010-0003",
+    providerType: ProviderType.CENTER_BASED,
+    status: RegistrationStatus.REGISTERED,
+    attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "en",
+    notes: "Needs Spanish materials",
+    createdAt: new Date("2026-06-09T16:00:00.000Z"),
+  },
+  {
+    id: "registration-tomas-boston-virtual-june-20",
+    sessionId: "seed-session-boston-virtual",
+    userId: "appuser-tomas-herrera",
+    providerName: "Tomás Herrera",
+    organizationName: "Tiny Explorers Family Child Care",
+    contactEmail: "t.herrera@littlesteps.org",
+    phone: "(555) 010-0006",
+    providerType: ProviderType.FAMILY_CHILD_CARE,
+    status: RegistrationStatus.REGISTERED,
+    attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "es",
+    notes: null,
+    createdAt: new Date("2026-06-10T08:30:00.000Z"),
+  },
+  {
+    id: "registration-priya-boston-summer-july-10",
+    sessionId: "seed-session-boston-summer",
+    userId: "appuser-priya-nair",
+    providerName: "Priya Nair",
+    organizationName: "Harbor View Kids Academy",
+    contactEmail: "priya.nair@example.com",
+    phone: "(555) 010-0005",
+    providerType: ProviderType.CENTER_BASED,
+    status: RegistrationStatus.REGISTERED,
+    attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "en",
+    notes: null,
+    createdAt: new Date("2026-06-11T12:00:00.000Z"),
+  },
+  {
+    id: "registration-devon-boston-summer-july-10",
+    sessionId: "seed-session-boston-summer",
+    userId: "appuser-devon-walsh",
+    providerName: "Devon Walsh",
+    organizationName: "Rising Stars Early Learning",
+    contactEmail: "d.walsh@brightstart.org",
+    phone: "(555) 010-0004",
+    providerType: ProviderType.CENTER_BASED,
+    status: RegistrationStatus.REGISTERED,
+    attendanceStatus: AttendanceStatus.NOT_MARKED,
+    preferredLanguage: "en",
+    notes: "Renewal training",
+    createdAt: new Date("2026-06-12T09:00:00.000Z"),
   },
 ];
 
 async function main() {
+  const ownerEmails = [
+    "deep.patel.0603@gmail.com",
+    "deepp03@bu.edu",
+    "deeppatel0306@gmail.com",
+  ];
+
+  await prisma.appUser.deleteMany({
+    where: {
+      email: { in: ownerEmails },
+      id: { not: "appuser-maria-rodriguez" },
+    },
+  });
+
+  await prisma.appUser.deleteMany({
+    where: {
+      email: {
+        in: [
+          "m.rodriguez@example.com",
+          "staff.boston@example.com",
+          "omar.admin@example.com",
+        ],
+      },
+    },
+  });
+
+  await prisma.staffUser.deleteMany({
+    where: {
+      email: {
+        in: ["staff.boston@example.com", "omar.admin@example.com"],
+      },
+      id: { not: "seed-staff-boston" },
+    },
+  });
+
   for (const agency of agencies) {
     await prisma.agency.upsert({
       where: { id: agency.id },
@@ -546,6 +669,11 @@ async function main() {
   }
 
   for (const staffUser of staffUsers) {
+    const clerkUserId =
+      staffUser.clerkUserId && staffUser.clerkUserId.trim().length > 0
+        ? staffUser.clerkUserId
+        : null;
+
     await prisma.staffUser.upsert({
       where: { id: staffUser.id },
       update: {
@@ -553,9 +681,12 @@ async function main() {
         name: staffUser.name,
         role: staffUser.role,
         agencyId: staffUser.agencyId,
-        ...(staffUser.clerkUserId ? { clerkUserId: staffUser.clerkUserId } : {}),
+        clerkUserId,
       },
-      create: staffUser,
+      create: {
+        ...staffUser,
+        clerkUserId,
+      },
     });
   }
 
@@ -593,9 +724,13 @@ async function main() {
   }
 
   console.log(
-    "\nTest accounts: run `npm run account:link -- <role> <clerkUserId> [agencyId]` after signing up in Clerk.",
-    "\nRoles: provider | ccrr | eec",
-    "\nExample: npm run account:link -- ccrr user_abc123 seed-agency-boston",
+    "\nDemo accounts (sign up in Clerk first, then open the portal):",
+    "\n  Provider:  deep.patel.0603@gmail.com  -> /provider",
+    "\n  CCR&R:     deeppatel0306@gmail.com     -> /ccrr",
+    "\n  EEC Admin: deepp03@bu.edu               -> /eec",
+    "\n\nBoston CCR&R demo data:",
+    "\n  3 upcoming sessions with registrants (virtual, in-person, summer refresher)",
+    "\n  Run: npm run demo:verify",
   );
 }
 

@@ -15,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "account:link": "tsx scripts/link-clerk-account.ts",
     "account:status": "tsx scripts/account-status.ts",
+    "demo:verify": "tsx scripts/verify-demo-data.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

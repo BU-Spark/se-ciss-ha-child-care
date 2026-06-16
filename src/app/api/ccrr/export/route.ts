@@ -1,3 +1,5 @@
+import { SessionStatus } from "@prisma/client";
+
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError } from "@/lib/api/response";
 import { requireCcrrAgencyId, requireRole } from "@/lib/auth/require-user";
@@ -26,7 +28,7 @@ export async function GET() {
     }
 
     const sessions = await prisma.orientationSession.findMany({
-      where: { agencyId },
+      where: { agencyId, status: SessionStatus.PUBLISHED },
       orderBy: { startsAt: "desc" },
       include: {
         registrations: {

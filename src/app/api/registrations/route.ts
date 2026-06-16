@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
+import { linkAppUserForClerk } from "@/lib/auth/link-app-user";
 import { isSupportedLanguage } from "@/lib/languages";
 import { prisma } from "@/lib/db";
 import { activeRegistrationStatusFilter } from "@/lib/registration-status";
@@ -83,12 +84,12 @@ export async function POST(request: Request) {
         throw ApiError.forbidden("Staff accounts cannot register as providers");
       }
 
-      const appUser = await tx.appUser.upsert({
-        where: { clerkUserId: userId },
+      const appUser = await linkAppUserForClerk(tx, {
+        clerkUserId: userId,
+        email: primaryEmail,
+        firstName: clerkUser?.firstName,
+        lastName: clerkUser?.lastName,
         update: {
-          email: primaryEmail,
-          firstName: clerkUser?.firstName,
-          lastName: clerkUser?.lastName,
           providerName: body.data.providerName,
           organizationName: body.data.organizationName,
           phone: body.data.phone,
@@ -97,11 +98,6 @@ export async function POST(request: Request) {
           ...(stateProviderId ? { stateProviderId } : {}),
         },
         create: {
-          clerkUserId: userId,
-          email: primaryEmail,
-          firstName: clerkUser?.firstName,
-          lastName: clerkUser?.lastName,
-          role: "PROVIDER",
           providerName: body.data.providerName,
           organizationName: body.data.organizationName,
           phone: body.data.phone,
@@ -110,6 +106,13 @@ export async function POST(request: Request) {
           ...(stateProviderId ? { stateProviderId } : {}),
         },
       });
+
+      if (!appUser) {
+        throw ApiError.badRequest(
+          "Unable to create provider profile",
+          "PROFILE_CREATE_FAILED",
+        );
+      }
 
       const existingRegistration = await tx.registration.findFirst({
         where: {

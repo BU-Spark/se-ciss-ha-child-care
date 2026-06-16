@@ -2,6 +2,8 @@ import "dotenv/config";
 
 import { PrismaClient, UserRole } from "@prisma/client";
 
+import { isPlaceholderClerkUserId } from "../src/lib/auth/link-app-user";
+
 const prisma = new PrismaClient();
 
 const AGENCIES = [
@@ -69,20 +71,40 @@ async function resolveAgencyId(agencyArg: string | undefined) {
 }
 
 async function linkProvider(clerkUserId: string, email: string) {
-  const user = await prisma.appUser.upsert({
-    where: { clerkUserId },
-    update: {
-      email,
-      role: UserRole.PROVIDER,
-    },
-    create: {
-      clerkUserId,
-      email,
-      role: UserRole.PROVIDER,
+  await prisma.staffUser.deleteMany({ where: { clerkUserId } });
+
+  const existing = await prisma.appUser.findFirst({
+    where: {
+      OR: [{ clerkUserId }, { email }],
     },
   });
 
-  await prisma.staffUser.deleteMany({ where: { clerkUserId } });
+  if (
+    existing &&
+    existing.clerkUserId !== clerkUserId &&
+    !isPlaceholderClerkUserId(existing.clerkUserId)
+  ) {
+    throw new Error(
+      `Email "${email}" is already linked to another Clerk account (${existing.clerkUserId}).`,
+    );
+  }
+
+  const user = existing
+    ? await prisma.appUser.update({
+        where: { id: existing.id },
+        data: {
+          clerkUserId,
+          email,
+          role: UserRole.PROVIDER,
+        },
+      })
+    : await prisma.appUser.create({
+        data: {
+          clerkUserId,
+          email,
+          role: UserRole.PROVIDER,
+        },
+      });
 
   return {
     role: "provider",
