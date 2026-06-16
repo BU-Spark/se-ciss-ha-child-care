@@ -3,6 +3,7 @@ import { SessionFormat } from "@prisma/client";
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
+import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 
 function parseFormat(format: string | null) {
   if (!format) {
@@ -25,6 +26,23 @@ function parseFormat(format: string | null) {
   );
 }
 
+function parseDate(date: string | null, fieldName: string) {
+  if (!date) {
+    return undefined;
+  }
+
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw ApiError.badRequest(
+      `${fieldName} must be formatted as YYYY-MM-DD`,
+      "INVALID_DATE",
+    );
+  }
+
+  return parsed;
+}
+
 function getDateBounds(date: string | null) {
   if (!date) {
     return undefined;
@@ -45,24 +63,67 @@ function getDateBounds(date: string | null) {
   return { start, end };
 }
 
+function getWindowBounds(searchParams: URLSearchParams, now: Date) {
+  const from = parseDate(searchParams.get("from"), "from");
+  const to = parseDate(searchParams.get("to"), "to");
+  const singleDay = getDateBounds(searchParams.get("date"));
+
+  if (from || to) {
+    if (from && to && to < from) {
+      throw ApiError.badRequest(
+        "to must be on or after from",
+        "INVALID_DATE_RANGE",
+      );
+    }
+
+    return {
+      start: from ?? now,
+      end: to,
+    };
+  }
+
+  if (singleDay) {
+    return {
+      start: singleDay.start,
+      end: singleDay.end,
+    };
+  }
+
+  return undefined;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const region = searchParams.get("region")?.trim();
+    const agency = searchParams.get("agency")?.trim();
+    const agencyId = searchParams.get("agencyId")?.trim();
+    const language = searchParams.get("language")?.trim();
     const format = parseFormat(searchParams.get("format"));
-    const dateBounds = getDateBounds(searchParams.get("date"));
     const now = new Date();
+    const windowBounds = getWindowBounds(searchParams, now);
 
     const sessions = await prisma.orientationSession.findMany({
       where: {
         status: "PUBLISHED",
-        startsAt: dateBounds
+        startsAt: windowBounds
           ? {
-              gte: dateBounds.start > now ? dateBounds.start : now,
-              lt: dateBounds.end,
+              gte: windowBounds.start > now ? windowBounds.start : now,
+              ...(windowBounds.end ? { lt: windowBounds.end } : {}),
             }
           : { gte: now },
         ...(region ? { region: { equals: region, mode: "insensitive" } } : {}),
+        ...(agencyId ? { agencyId } : {}),
+        ...(agency && !agencyId
+          ? {
+              agency: {
+                name: { equals: agency, mode: "insensitive" },
+              },
+            }
+          : {}),
+        ...(language && language !== "All Languages"
+          ? { language: { equals: language, mode: "insensitive" } }
+          : {}),
         ...(format ? { format } : {}),
       },
       orderBy: { startsAt: "asc" },
@@ -77,9 +138,7 @@ export async function GET(request: Request) {
         _count: {
           select: {
             registrations: {
-              where: {
-                status: "REGISTERED",
-              },
+              where: activeRegistrationStatusFilter,
             },
           },
         },
@@ -96,6 +155,7 @@ export async function GET(request: Request) {
           title: session.title,
           description: session.description,
           region: session.region,
+          language: session.language,
           format: session.format,
           startsAt: session.startsAt.toISOString(),
           endsAt: session.endsAt.toISOString(),

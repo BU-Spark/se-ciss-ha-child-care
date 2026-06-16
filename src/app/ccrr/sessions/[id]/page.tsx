@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useAuth, UserButton } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { PersonaNav } from "@/components/persona-nav";
+import { PortalNotice } from "@/components/portal-notice";
+import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
+import { usePersonaGuard } from "@/hooks/use-persona-guard";
 
 type Provider = {
   id: string;
   name: string;
   email: string;
+  stateProviderId: string | null;
   registrationDate: string;
-  attended: boolean;
+  attendanceStatus: "NOT_MARKED" | "ATTENDED" | "NO_SHOW";
   notes: string;
 };
 
@@ -25,136 +29,265 @@ type SessionDetail = {
   totalRegistered: number;
 };
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-// TODO: replace with GET /api/ccrr/sessions/[id]/registrations
-
-const MOCK_SESSIONS: Record<string, SessionDetail> = {
-  "44219": { id: "44219", title: "EEC Orientation – CCR&R Staff", date: "June 14, 2024", time: "10:00 AM - 12:30 PM", format: "Virtual (Zoom)", facilitator: "Sarah Mitchell", totalRegistered: 3 },
-  "44225": { id: "44225", title: "EEC Orientation – CCR&R Staff", date: "June 21, 2024", time: "1:00 PM - 3:30 PM", format: "In-person", facilitator: "Sarah Mitchell", totalRegistered: 2 },
-  "44231": { id: "44231", title: "EEC Orientation – CCR&R Staff", date: "June 28, 2024", time: "9:00 AM - 11:30 AM", format: "Virtual (Zoom)", facilitator: "Sarah Mitchell", totalRegistered: 1 },
+type ApiRegistration = {
+  id: string;
+  providerName: string;
+  contactEmail: string;
+  stateProviderId: string | null;
+  attendanceStatus: "NOT_MARKED" | "ATTENDED" | "NO_SHOW";
+  notes: string | null;
+  registeredAt: string;
 };
 
-const MOCK_PROVIDERS_BY_SESSION: Record<string, Provider[]> = {
-  "44219": [
-    { id: "1", name: "Maria Rodriguez", email: "m.rodriguez@example.com", registrationDate: "Jun 2, 2024", attended: false, notes: "" },
-    { id: "2", name: "James Chen", email: "j.chen@daycare.org", registrationDate: "Jun 4, 2024", attended: true, notes: "Arrived 5 mins late" },
-    { id: "3", name: "Althea Jenkins", email: "ajenkins@provider.net", registrationDate: "Jun 5, 2024", attended: false, notes: "" },
-  ],
-  "44225": [
-    { id: "4", name: "Devon Walsh", email: "d.walsh@brightstart.org", registrationDate: "Jun 9, 2024", attended: false, notes: "" },
-    { id: "5", name: "Priya Nair", email: "priya.nair@example.com", registrationDate: "Jun 11, 2024", attended: false, notes: "" },
-  ],
-  "44231": [
-    { id: "6", name: "Tomás Herrera", email: "t.herrera@littlesteps.org", registrationDate: "Jun 18, 2024", attended: false, notes: "" },
-  ],
+type ApiSession = {
+  id: string;
+  title: string;
+  format: "VIRTUAL" | "IN_PERSON";
+  startsAt: string;
+  endsAt: string;
+  locationName: string | null;
+  meetingUrl: string | null;
+  registeredCount: number;
+  agency: { id: string; name: string; region: string };
 };
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function NavBar() {
-  const [active, setActive] = useState("Sessions");
-  return (
-    <header className="border-b border-[#e2e6ed] bg-white sticky top-0 z-10">
-      <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-[#1a2f5e] flex items-center justify-center text-white text-xs font-bold">M</div>
-            <span className="font-semibold text-[#1a2f5e] text-sm">EEC Orientation</span>
-          </div>
-          <nav className="flex gap-1">
-            {["Dashboard", "Sessions", "Resources"].map((tab) => (
-              <button key={tab} onClick={() => setActive(tab)} className={`px-3 py-1.5 text-sm font-medium transition-colors ${active === tab ? "text-[#1a2f5e] border-b-2 border-[#1a2f5e]" : "text-zinc-500 hover:text-zinc-800"}`}>{tab}</button>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-zinc-600">CCR&amp;R Staff</span>
-          <UserButton />
-        </div>
-      </div>
-    </header>
-  );
+function formatSessionDate(startsAt: string) {
+  return new Date(startsAt).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function formatSessionTime(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const end = new Date(endsAt).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${start} - ${end}`;
+}
+
+function formatRegistrationDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatSessionFormat(
+  format: "VIRTUAL" | "IN_PERSON",
+  locationName: string | null,
+  meetingUrl: string | null,
+) {
+  if (format === "VIRTUAL") {
+    return meetingUrl ? "Virtual (Zoom)" : "Virtual";
+  }
+
+  return locationName ? `In-person (${locationName})` : "In-person";
+}
+
+function mapSession(session: ApiSession): SessionDetail {
+  return {
+    id: session.id,
+    title: session.title,
+    date: formatSessionDate(session.startsAt),
+    time: formatSessionTime(session.startsAt, session.endsAt),
+    format: formatSessionFormat(
+      session.format,
+      session.locationName,
+      session.meetingUrl,
+    ),
+    facilitator: session.agency.name,
+    totalRegistered: session.registeredCount,
+  };
+}
+
+function mapRegistration(registration: ApiRegistration): Provider {
+  return {
+    id: registration.id,
+    name: registration.providerName,
+    email: registration.contactEmail,
+    stateProviderId: registration.stateProviderId,
+    registrationDate: formatRegistrationDate(registration.registeredAt),
+    attendanceStatus: registration.attendanceStatus,
+    notes: registration.notes ?? "",
+  };
+}
 
 export default function SessionDetailPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
+  const { isReady: portalReady, notice: portalNotice, setupMessage, portalLabel, canLoadData } = usePersonaGuard("ccrr");
   const params = useParams();
   const sessionId = params.id as string;
 
-  // Derived, not state — recomputes when the route param changes.
-  const session = MOCK_SESSIONS[sessionId] ?? null;
-
-  // Stays as state because attendance toggles/notes mutate it.
-  const [providers, setProviders] = useState<Provider[]>(
-    MOCK_PROVIDERS_BY_SESSION[sessionId] ?? []
-  );
+  const [session, setSession] = useState<SessionDetail | null>(null);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [initialProviders, setInitialProviders] = useState<Provider[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Redirect if not logged in
   useEffect(() => {
-    if (isLoaded && !userId) router.push("/sign-in");
-  }, [isLoaded, userId, router]);
+    if (isLoaded && !userId) {
+      router.push(`/sign-in?redirect_url=${encodeURIComponent(`/ccrr/sessions/${sessionId}`)}`);
+    }
+  }, [isLoaded, userId, router, sessionId]);
 
-  // Redirect to dashboard if the session id doesn't exist (only once auth is settled)
   useEffect(() => {
-    if (isLoaded && userId && !session) router.replace("/ccrr");
-  }, [isLoaded, userId, session, router]);
+    async function fetchSession() {
+      setLoading(true);
+      setError(null);
+      setSaved(false);
+      setSaveError(null);
 
-  // Reset provider state when navigating between sessions (component may be reused)
-  useEffect(() => {
-    setProviders(MOCK_PROVIDERS_BY_SESSION[sessionId] ?? []);
-    setSaved(false);
-  }, [sessionId]);
+      try {
+        const res = await fetch(`/api/ccrr/sessions/${sessionId}/registrations`);
+        const json = await res.json();
 
-  // TODO: fetch real session + registrations
-  // useEffect(() => {
-  //   fetch(`/api/ccrr/sessions/${sessionId}/registrations`)
-  //     .then(r => r.json())
-  //     .then(json => { setProviders(json.data.registrations); });
-  // }, [sessionId]);
+        if (!res.ok || !json.success) {
+          if (res.status === 404) {
+            router.replace("/ccrr");
+            return;
+          }
 
-  function toggleAttended(id: string) {
+          setError(json.error?.message ?? "Unable to load session.");
+          setSession(null);
+          setProviders([]);
+          return;
+        }
+
+        const mappedProviders = (json.data.registrations as ApiRegistration[]).map(
+          mapRegistration,
+        );
+        setSession(mapSession(json.data.session as ApiSession));
+        setProviders(mappedProviders);
+        setInitialProviders(mappedProviders);
+      } catch {
+        setError("Network error. Please try again.");
+        setSession(null);
+        setProviders([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (canLoadData && sessionId) {
+      fetchSession();
+    }
+  }, [canLoadData, sessionId, router]);
+
+  function setAttendanceStatus(
+    id: string,
+    attendanceStatus: Provider["attendanceStatus"],
+  ) {
     setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, attended: !p.attended } : p))
+      prev.map((p) => (p.id === id ? { ...p, attendanceStatus } : p)),
     );
     setSaved(false);
+    setSaveError(null);
   }
 
   function updateNotes(id: string, notes: string) {
     setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, notes } : p))
+      prev.map((p) => (p.id === id ? { ...p, notes } : p)),
     );
     setSaved(false);
+    setSaveError(null);
+  }
+
+  function providerChanged(provider: Provider, initial: Provider) {
+    return (
+      provider.attendanceStatus !== initial.attendanceStatus ||
+      provider.notes.trim() !== initial.notes.trim()
+    );
   }
 
   async function handleMarkAttendance() {
     setSaving(true);
-    // TODO: POST /api/ccrr/sessions/[id]/attendance with providers attendance data
-    await new Promise((r) => setTimeout(r, 800)); // simulate API call
-    setSaving(false);
-    setSaved(true);
+    setSaveError(null);
+
+    const changedProviders = providers.filter((provider) => {
+      const initial = initialProviders.find((entry) => entry.id === provider.id);
+      return initial ? providerChanged(provider, initial) : false;
+    });
+
+    if (changedProviders.length === 0) {
+      setSaving(false);
+      setSaveError("No attendance changes to save.");
+      return;
+    }
+
+    try {
+      for (const provider of changedProviders) {
+        const res = await fetch(`/api/registrations/${provider.id}/attendance`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            attendanceStatus: provider.attendanceStatus,
+            notes: provider.notes.trim() || null,
+          }),
+        });
+        const json = await res.json();
+
+        if (!res.ok || !json.success) {
+          throw new Error(json.error?.message ?? "Failed to save attendance.");
+        }
+      }
+
+      setInitialProviders(providers);
+      setSaved(true);
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : "Failed to save attendance.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!isLoaded || !userId) return null;
-  if (!session) return null; // redirect effect handles navigation
 
   return (
+    <PersonaGuardBoundary
+      portal="ccrr"
+      isReady={portalReady}
+      setupMessage={setupMessage}
+      portalLabel={portalLabel}
+    >
+  {loading ? (
+      <div className="min-h-screen bg-zinc-50 flex flex-col">
+        <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
+        <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
+          <p className="text-sm text-zinc-400 py-12 text-center">Loading session...</p>
+        </main>
+      </div>
+  ) : !session ? (
+      <div className="min-h-screen bg-zinc-50 flex flex-col">
+        <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
+        <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
+          <p className="text-sm text-red-600 py-12 text-center">{error ?? "Session not found."}</p>
+        </main>
+      </div>
+  ) : (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
-      <NavBar />
+      <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-6">
+        <PortalNotice message={portalNotice} />
 
-        {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-zinc-400">
           <button onClick={() => router.push("/ccrr")} className="hover:text-zinc-600 transition-colors">Dashboard</button>
           <span>›</span>
           <span className="text-zinc-600 font-medium">Session Details</span>
         </div>
 
-        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2f5e]">{session.title}</h1>
@@ -172,7 +305,6 @@ export default function SessionDetailPage() {
           </div>
         </div>
 
-        {/* Session Info Row */}
         <div className="grid grid-cols-3 gap-4">
           {[
             { label: "DATE", value: session.date },
@@ -186,46 +318,61 @@ export default function SessionDetailPage() {
           ))}
         </div>
 
-        {/* Attendance Table */}
         <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
-                {["Provider Name", "Email", "Registration Date", "Attended", "Notes"].map((h) => (
+                {["Provider Name", "Email", "PID", "Registration Date", "Attendance", "Notes"].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {providers.map((provider) => (
-                <tr key={provider.id} className="border-b border-zinc-50 hover:bg-zinc-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-zinc-800">{provider.name}</td>
-                  <td className="px-4 py-3 text-zinc-500">{provider.email}</td>
-                  <td className="px-4 py-3 text-zinc-500">{provider.registrationDate}</td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={provider.attended}
-                      onChange={() => toggleAttended(provider.id)}
-                      className="w-4 h-4 rounded border-zinc-300 accent-[#1a2f5e] cursor-pointer"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="text"
-                      value={provider.notes}
-                      onChange={(e) => updateNotes(provider.id, e.target.value)}
-                      placeholder="Add note..."
-                      className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e] w-full"
-                    />
+              {providers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-zinc-400">
+                    No registrations for this session yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                providers.map((provider) => (
+                  <tr key={provider.id} className="border-b border-zinc-50 hover:bg-zinc-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-zinc-800">{provider.name}</td>
+                    <td className="px-4 py-3 text-zinc-500">{provider.email}</td>
+                    <td className="px-4 py-3 text-zinc-500 font-mono text-xs">{provider.stateProviderId ?? "—"}</td>
+                    <td className="px-4 py-3 text-zinc-500">{provider.registrationDate}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={provider.attendanceStatus}
+                        onChange={(e) =>
+                          setAttendanceStatus(
+                            provider.id,
+                            e.target.value as Provider["attendanceStatus"],
+                          )
+                        }
+                        className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e]"
+                      >
+                        <option value="NOT_MARKED">Not marked</option>
+                        <option value="ATTENDED">Attended</option>
+                        <option value="NO_SHOW">No-show</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="text"
+                        value={provider.notes}
+                        onChange={(e) => updateNotes(provider.id, e.target.value)}
+                        placeholder="Add note..."
+                        className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e] w-full"
+                      />
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex items-center justify-between">
           <div>
             {saved && (
@@ -234,15 +381,15 @@ export default function SessionDetailPage() {
                 Attendance saved
               </span>
             )}
+            {saveError && (
+              <span className="text-sm text-red-600">{saveError}</span>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 border border-zinc-300 bg-white text-zinc-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-zinc-50 transition-colors">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-              Send Follow-up Email
-            </button>
             <button
+              type="button"
               onClick={handleMarkAttendance}
-              disabled={saving}
+              disabled={saving || providers.length === 0}
               className="flex items-center gap-2 bg-[#1a2f5e] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors disabled:opacity-50"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
@@ -253,7 +400,6 @@ export default function SessionDetailPage() {
 
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-zinc-200 bg-white py-4 px-6">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
           <div>
@@ -268,5 +414,7 @@ export default function SessionDetailPage() {
         </div>
       </footer>
     </div>
+  )}
+    </PersonaGuardBoundary>
   );
 }

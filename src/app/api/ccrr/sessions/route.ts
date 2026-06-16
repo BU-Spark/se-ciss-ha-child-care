@@ -1,6 +1,7 @@
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { requireCcrrAgencyId, requireRole } from "@/lib/auth/current-profile";
 import { prisma } from "@/lib/db";
+import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 
 export async function GET() {
   try {
@@ -26,9 +27,7 @@ export async function GET() {
         _count: {
           select: {
             registrations: {
-              where: {
-                status: "REGISTERED",
-              },
+              where: activeRegistrationStatusFilter,
             },
           },
         },

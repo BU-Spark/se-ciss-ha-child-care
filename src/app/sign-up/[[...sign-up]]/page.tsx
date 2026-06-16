@@ -1,9 +1,17 @@
-import { SignUp } from "@clerk/nextjs";
+import { Suspense } from "react";
+
+import SignUpContent from "./sign-up-content";
 
 export default function SignUpPage() {
   return (
-    <div className="flex min-h-full items-center justify-center">
-      <SignUp />
-    </div>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">
+          Loading sign up...
+        </div>
+      }
+    >
+      <SignUpContent />
+    </Suspense>
   );
 }

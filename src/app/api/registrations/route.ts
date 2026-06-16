@@ -4,7 +4,10 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
+import { linkAppUserForClerk } from "@/lib/auth/link-app-user";
+import { isSupportedLanguage } from "@/lib/languages";
 import { prisma } from "@/lib/db";
+import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 
 const registrationSchema = z.object({
   sessionId: z.string().min(1),
@@ -12,6 +15,7 @@ const registrationSchema = z.object({
   organizationName: z.string().min(1),
   contactEmail: z.string().email(),
   phone: z.string().optional(),
+  stateProviderId: z.string().optional(),
   providerType: z
     .enum([
       ProviderType.CENTER_BASED,
@@ -21,6 +25,7 @@ const registrationSchema = z.object({
       ProviderType.UNKNOWN,
     ])
     .default(ProviderType.UNKNOWN),
+  preferredLanguage: z.string().min(2).max(10).optional(),
 });
 
 export async function POST(request: Request) {
@@ -40,6 +45,11 @@ export async function POST(request: Request) {
     const clerkUser = await currentUser();
     const primaryEmail =
       clerkUser?.primaryEmailAddress?.emailAddress ?? body.data.contactEmail;
+    const stateProviderId = body.data.stateProviderId?.trim();
+    const preferredLanguage =
+      body.data.preferredLanguage && isSupportedLanguage(body.data.preferredLanguage)
+        ? body.data.preferredLanguage
+        : undefined;
 
     const result = await prisma.$transaction(async (tx) => {
       const session = await tx.orientationSession.findUnique({
@@ -74,29 +84,35 @@ export async function POST(request: Request) {
         throw ApiError.forbidden("Staff accounts cannot register as providers");
       }
 
-      const appUser = await tx.appUser.upsert({
-        where: { clerkUserId: userId },
+      const appUser = await linkAppUserForClerk(tx, {
+        clerkUserId: userId,
+        email: primaryEmail,
+        firstName: clerkUser?.firstName,
+        lastName: clerkUser?.lastName,
         update: {
-          email: primaryEmail,
-          firstName: clerkUser?.firstName,
-          lastName: clerkUser?.lastName,
           providerName: body.data.providerName,
           organizationName: body.data.organizationName,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          ...(preferredLanguage ? { preferredLanguage } : {}),
+          ...(stateProviderId ? { stateProviderId } : {}),
         },
         create: {
-          clerkUserId: userId,
-          email: primaryEmail,
-          firstName: clerkUser?.firstName,
-          lastName: clerkUser?.lastName,
-          role: "PROVIDER",
           providerName: body.data.providerName,
           organizationName: body.data.organizationName,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          preferredLanguage: preferredLanguage ?? "en",
+          ...(stateProviderId ? { stateProviderId } : {}),
         },
       });
+
+      if (!appUser) {
+        throw ApiError.badRequest(
+          "Unable to create provider profile",
+          "PROFILE_CREATE_FAILED",
+        );
+      }
 
       const existingRegistration = await tx.registration.findFirst({
         where: {
@@ -116,7 +132,7 @@ export async function POST(request: Request) {
       const registeredCount = await tx.registration.count({
         where: {
           sessionId: session.id,
-          status: "REGISTERED",
+          ...activeRegistrationStatusFilter,
         },
       });
       const capacity = session.capacity ?? 0;
@@ -124,6 +140,9 @@ export async function POST(request: Request) {
       if (capacity > 0 && registeredCount >= capacity) {
         throw ApiError.conflict("This session is full", "SESSION_FULL");
       }
+
+      const registrationStateProviderId =
+        stateProviderId ?? appUser.stateProviderId ?? undefined;
 
       const registration = await tx.registration.create({
         data: {
@@ -134,6 +153,8 @@ export async function POST(request: Request) {
           contactEmail: body.data.contactEmail,
           phone: body.data.phone,
           providerType: body.data.providerType,
+          stateProviderId: registrationStateProviderId,
+          preferredLanguage: preferredLanguage ?? appUser.preferredLanguage,
           status: "REGISTERED",
           attendanceStatus: "NOT_MARKED",
         },
