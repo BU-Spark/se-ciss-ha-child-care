@@ -291,7 +291,7 @@ export default function SessionDetailPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2f5e]">{session.title}</h1>
-            <p className="text-sm text-zinc-500 mt-1">Manage attendance and session records for active childcare providers.</p>
+            <p className="text-sm text-zinc-500 mt-1">Manage attendance and session records for active early care and education providers.</p>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 flex items-center gap-1.5">

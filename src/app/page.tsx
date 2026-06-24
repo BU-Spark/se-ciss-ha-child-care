@@ -22,7 +22,7 @@ export default function Home() {
           <p className="text-xs font-medium uppercase tracking-widest text-blue-300 mb-4">Commonwealth of Massachusetts</p>
           <h1 className="text-3xl font-bold sm:text-4xl">EEC Orientation Management</h1>
           <p className="mt-4 text-base text-blue-100 max-w-2xl leading-relaxed">
-            Unified system for child care providers to register for orientation sessions and for CCR&amp;R agencies and EEC to track participation statewide.
+            Unified system for early care and education providers to register for orientation sessions and for CCR&amp;R agencies and EEC to track participation statewide.
           </p>
         </div>
       </div>
