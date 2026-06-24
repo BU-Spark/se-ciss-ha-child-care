@@ -764,10 +764,13 @@ export default function ProviderPage() {
         <PortalNotice message={portalNotice} />
         <div>
           <h1 className="text-2xl font-bold text-[#1a2f5e]">Orientation Dashboard</h1>
-          <p className="mt-1 text-sm text-zinc-500">Register for upcoming orientation sessions required for Massachusetts child care providers. Browse available slots by agency, region, language, and format.</p>
+          <p className="mt-1 text-sm text-zinc-500">Register for upcoming orientation sessions required for Massachusetts early care and education providers. Browse available slots by agency, region, language, and format — <span className="font-medium text-zinc-700">you can register for any orientation across the state, not just your region.</span></p>
         </div>
 
         {/* Filters */}
+        <p className="text-xs text-zinc-500 -mb-2">
+          Orientations are open statewide — leave <span className="font-medium">Region</span> set to “All Regions” to see every available session, or filter to a specific region.
+        </p>
         <div className="border border-zinc-200 rounded-lg bg-white p-4 flex flex-wrap gap-4 items-end">
           {[
             { label: "CCR&R Agency", value: agency, setter: setAgency, opts: ["All Agencies", ...agencies.map((entry) => entry.name)] },
