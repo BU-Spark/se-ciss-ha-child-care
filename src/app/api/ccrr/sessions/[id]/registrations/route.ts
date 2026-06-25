@@ -1,6 +1,9 @@
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
-import { requireAgencyAccess, requireRole } from "@/lib/auth/require-user";
+import {
+  requireCcrrAgencyId,
+  requireRole,
+} from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db";
 import { rosterRegistrationStatusFilter } from "@/lib/registration-status";
 
@@ -9,7 +12,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireRole(["CCRR_STAFF", "EEC_ADMIN"]);
+    const profile = await requireRole(["CCRR_STAFF", "EEC_ADMIN"]);
     const { id } = await context.params;
 
     const session = await prisma.orientationSession.findUnique({
@@ -40,10 +43,13 @@ export async function GET(
       throw ApiError.notFound("Session not found");
     }
 
-    // CCR&R staff can only read their own agency's roster; EEC admins read any.
-    await requireAgencyAccess(session.agencyId);
+    const canManageAttendance =
+      profile.role === "EEC_ADMIN" ||
+      (profile.role === "CCRR_STAFF" &&
+        session.agencyId === requireCcrrAgencyId(profile));
 
     return jsonSuccess({
+      canManageAttendance,
       session: {
         id: session.id,
         title: session.title,

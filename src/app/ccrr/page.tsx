@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
@@ -31,9 +32,42 @@ type ApiSession = {
   spotsLeft: number | null;
 };
 
+type StatewideRegistration = {
+  id: string;
+  providerName: string;
+  organizationName: string;
+  contactEmail: string;
+  stateProviderId: string | null;
+  attendanceLabel: string;
+  registeredAt: string;
+  canManageAttendance: boolean;
+  session: {
+    id: string;
+    title: string;
+    region: string;
+    format: string;
+    startsAt: string;
+    agency: { id: string; name: string; region: string };
+  };
+};
+
+type AgencyOption = {
+  id: string;
+  name: string;
+  region: string;
+};
+
 function formatSessionDate(startsAt: string) {
   return new Date(startsAt).toLocaleDateString("en-US", {
     month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
     day: "numeric",
     year: "numeric",
   });
@@ -108,6 +142,20 @@ export default function CcrrPage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [registrations, setRegistrations] = useState<StatewideRegistration[]>([]);
+  const [agencies, setAgencies] = useState<AgencyOption[]>([]);
+  const [registrationsLoading, setRegistrationsLoading] = useState(true);
+  const [registrationsError, setRegistrationsError] = useState<string | null>(null);
+  const [agencyFilter, setAgencyFilter] = useState("All Agencies");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const ccrrNavItems = [
+    {
+      label: "Registrations",
+      segment: "registrations",
+      href: (base: string) => `${base}#registrations`,
+    },
+  ];
 
   useEffect(() => {
     async function fetchSessions() {
@@ -144,6 +192,49 @@ export default function CcrrPage() {
       fetchSessions();
     }
   }, [canLoadData]);
+
+  useEffect(() => {
+    async function fetchRegistrations() {
+      setRegistrationsLoading(true);
+      setRegistrationsError(null);
+
+      try {
+        const params = new URLSearchParams();
+        if (agencyFilter !== "All Agencies") {
+          params.set("agency", agencyFilter);
+        }
+        if (searchQuery.trim()) {
+          params.set("search", searchQuery.trim());
+        }
+
+        const query = params.toString();
+        const res = await fetch(
+          `/api/ccrr/registrations${query ? `?${query}` : ""}`,
+        );
+        const json = await res.json();
+
+        if (!res.ok || !json.success) {
+          setRegistrations([]);
+          setRegistrationsError(
+            json.error?.message ?? "Unable to load statewide registrations.",
+          );
+          return;
+        }
+
+        setRegistrations(json.data.registrations);
+        setAgencies(json.data.agencies);
+      } catch {
+        setRegistrations([]);
+        setRegistrationsError("Network error. Please try again.");
+      } finally {
+        setRegistrationsLoading(false);
+      }
+    }
+
+    if (canLoadData) {
+      fetchRegistrations();
+    }
+  }, [canLoadData, agencyFilter, searchQuery]);
 
   async function handleExport() {
     setExporting(true);
@@ -184,7 +275,11 @@ export default function CcrrPage() {
       portalLabel={portalLabel}
     >
     <div className="min-h-screen bg-zinc-50 flex flex-col">
-      <PersonaNav basePath="/ccrr" subtitle="Welcome, CCR&R Staff" />
+      <PersonaNav
+        basePath="/ccrr"
+        subtitle="Welcome, CCR&R Staff"
+        extraNavItems={ccrrNavItems}
+      />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
         <PortalNotice message={portalNotice} />
         <div className="flex items-start justify-between">
@@ -244,6 +339,156 @@ export default function CcrrPage() {
             </div>
           )}
         </section>
+
+        <section id="registrations" className="flex flex-col gap-4">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-zinc-700">
+            <p className="font-medium text-[#1a2f5e]">Statewide registrations (read-only)</p>
+            <p className="mt-1">
+              View registrations across all CCR&amp;R agencies. You can only mark attendance
+              for sessions hosted by your agency — use <strong>Manage attendance</strong> on
+              your own sessions above.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-zinc-800">All Registrations</h2>
+              <p className="text-sm text-zinc-500 mt-0.5">
+                {registrationsLoading
+                  ? "Loading..."
+                  : `${registrations.length} registration${registrations.length === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search provider, program, or agency..."
+                className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e] sm:w-64"
+              />
+              <select
+                value={agencyFilter}
+                onChange={(event) => setAgencyFilter(event.target.value)}
+                className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]"
+              >
+                <option value="All Agencies">All Agencies</option>
+                {agencies.map((agency) => (
+                  <option key={agency.id} value={agency.name}>
+                    {agency.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {registrationsError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {registrationsError}
+            </div>
+          )}
+
+          <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[900px]">
+                <thead>
+                  <tr className="border-b border-zinc-100 bg-zinc-50">
+                    {[
+                      "Provider",
+                      "Program",
+                      "Session",
+                      "Session Date",
+                      "Hosting Agency",
+                      "Attendance",
+                      "Registered",
+                      "",
+                    ].map((heading) => (
+                      <th
+                        key={heading}
+                        className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide"
+                      >
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrationsLoading ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-zinc-400">
+                        Loading registrations...
+                      </td>
+                    </tr>
+                  ) : registrations.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-zinc-400">
+                        No registrations found.
+                      </td>
+                    </tr>
+                  ) : (
+                    registrations.map((registration) => (
+                      <tr
+                        key={registration.id}
+                        className="border-b border-zinc-50 hover:bg-zinc-50 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-zinc-800">{registration.providerName}</p>
+                          <p className="text-xs text-zinc-500">{registration.contactEmail}</p>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">
+                          <p>{registration.organizationName}</p>
+                          {registration.stateProviderId ? (
+                            <p className="text-xs font-mono text-zinc-400">
+                              PID {registration.stateProviderId}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">
+                          <p>{registration.session.title}</p>
+                          <p className="text-xs text-zinc-400">
+                            {registration.session.format} · {registration.session.region}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
+                          {formatShortDate(registration.session.startsAt)}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">
+                          {registration.session.agency.name}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700">
+                            {registration.attendanceLabel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
+                          {formatShortDate(registration.registeredAt)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {registration.canManageAttendance ? (
+                            <Link
+                              href={`/ccrr/sessions/${registration.session.id}`}
+                              className="text-sm font-medium text-[#1a2f5e] hover:underline"
+                            >
+                              Manage attendance
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/ccrr/sessions/${registration.session.id}`}
+                              className="text-sm font-medium text-zinc-500 hover:underline"
+                            >
+                              View only
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <div id="resources" className="border-l-4 border-[#1a2f5e] bg-blue-50 rounded-r-lg px-5 py-4 flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-[#1a2f5e]">Quarterly Reporting Notice</p>
