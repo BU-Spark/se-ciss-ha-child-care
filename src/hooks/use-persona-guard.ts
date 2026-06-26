@@ -26,18 +26,24 @@ export function usePersonaGuard(portal: PortalId) {
   const router = useRouter();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const [isReady, setIsReady] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice] = useState<string | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    return new URLSearchParams(window.location.search).get("portalNotice");
+  });
   const [setupMessage, setSetupMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const redirectNotice = params.get("portalNotice");
-    if (redirectNotice) {
-      setNotice(redirectNotice);
-      const url = new URL(window.location.href);
-      url.searchParams.delete("portalNotice");
-      window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    if (!params.has("portalNotice")) {
+      return;
     }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("portalNotice");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
   }, []);
 
   useEffect(() => {

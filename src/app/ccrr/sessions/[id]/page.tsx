@@ -435,7 +435,7 @@ export default function SessionDetailPage() {
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
           <div>
             <p className="font-medium text-zinc-500">EEC Orientation</p>
-            <p>© 2024 Massachusetts Department of Early Education and Care</p>
+            <p>© 2026 Massachusetts Department of Early Education and Care</p>
           </div>
           <div className="flex gap-4">
             <a href="#" className="hover:text-zinc-600">Accessibility</a>

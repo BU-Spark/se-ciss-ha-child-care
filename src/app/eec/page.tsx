@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth, UserButton } from "@clerk/nextjs";
 
 import { PortalNotice } from "@/components/portal-notice";
@@ -210,7 +209,6 @@ function RegionalCompletionPanel({ regionalRates }: { regionalRates: RegionalRat
 
 export default function EecPage() {
   const { isLoaded, userId } = useAuth();
-  const router = useRouter();
   const { isReady: portalReady, notice: portalNotice, setupMessage, portalLabel, canLoadData } = usePersonaGuard("eec");
   const [activeNav, setActiveNav] = useState("Overview");
   const [agency, setAgency] = useState("All Agencies");
@@ -762,7 +760,7 @@ export default function EecPage() {
       </div>
       <footer className="border-t border-zinc-200 bg-white py-3 px-6">
         <div className="flex items-center justify-between text-xs text-zinc-400">
-          <span>© 2024 Massachusetts Department of Early Education and Care</span>
+          <span>© 2026 Massachusetts Department of Early Education and Care</span>
           <div className="flex gap-4">
             <a href="#" className="hover:text-zinc-600">Privacy Policy</a>
             <a href="#" className="hover:text-zinc-600">Terms of Service</a>

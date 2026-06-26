@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
@@ -587,7 +586,6 @@ function RegistrationRow({
 
 export default function ProviderPage() {
   const { isLoaded, userId } = useAuth();
-  const router = useRouter();
   const { isReady: portalReady, notice: portalNotice, setupMessage, portalLabel, canLoadData } = usePersonaGuard("provider");
   const [region, setRegion] = useState("All Regions");
   const [regions, setRegions] = useState<string[]>([]);
@@ -844,7 +842,7 @@ export default function ProviderPage() {
 
       <footer className="border-t border-zinc-200 bg-white py-4 px-6">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
-          <span>© 2024 Massachusetts Department of Early Education and Care</span>
+          <span>© 2026 Massachusetts Department of Early Education and Care</span>
           <div className="flex gap-4">
             <a href="#" className="hover:text-zinc-600">Accessibility</a>
             <a href="#" className="hover:text-zinc-600">Contact Support</a>

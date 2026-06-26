@@ -323,7 +323,7 @@ export default function CcrrPage() {
                     Sign in with your CCR&amp;R staff email, or run:
                   </p>
                   <code className="mt-1 block rounded bg-red-100 px-2 py-1 text-xs text-red-900">
-                    npm run account:link -- ccrr YOUR_CLERK_USER_ID seed-agency-boston deeppatel0306@gmail.com
+                    npm run account:link -- ccrr YOUR_CLERK_USER_ID seed-agency-boston staff@example.com
                   </code>
                 </>
               )}
@@ -499,7 +499,7 @@ export default function CcrrPage() {
       </main>
       <footer className="border-t border-zinc-200 bg-white py-4 px-6">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
-          <span>© 2024 Massachusetts Department of Early Education and Care</span>
+          <span>© 2026 Massachusetts Department of Early Education and Care</span>
           <div className="flex gap-4">
             <a href="#" className="hover:text-zinc-600">Accessibility</a>
             <a href="#" className="hover:text-zinc-600">Contact Support</a>
