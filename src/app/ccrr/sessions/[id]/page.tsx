@@ -27,6 +27,7 @@ type SessionDetail = {
   format: string;
   facilitator: string;
   totalRegistered: number;
+  status: string;
 };
 
 type ApiRegistration = {
@@ -43,6 +44,7 @@ type ApiSession = {
   id: string;
   title: string;
   format: "VIRTUAL" | "IN_PERSON";
+  status: string;
   startsAt: string;
   endsAt: string;
   locationName: string | null;
@@ -104,6 +106,7 @@ function mapSession(session: ApiSession): SessionDetail {
     ),
     facilitator: session.agency.name,
     totalRegistered: session.registeredCount,
+    status: session.status,
   };
 }
 
@@ -135,6 +138,8 @@ export default function SessionDetailPage() {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [canManageAttendance, setCanManageAttendance] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -255,6 +260,39 @@ export default function SessionDetailPage() {
     }
   }
 
+  async function handleCancelSession() {
+    const confirmed = window.confirm(
+      "Cancel this session? Providers will no longer be able to register.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCancelling(true);
+    setCancelError(null);
+
+    try {
+      const res = await fetch(`/api/ccrr/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CANCELLED" }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setCancelError(json.error?.message ?? "Unable to cancel session.");
+        return;
+      }
+
+      router.push("/ccrr#sessions");
+    } catch {
+      setCancelError("Network error. Please try again.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   if (!isLoaded || !userId) return null;
 
   return (
@@ -315,6 +353,18 @@ export default function SessionDetailPage() {
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             Attendance is read-only for this session. You can only mark attendance for
             sessions hosted by your agency.
+          </div>
+        )}
+
+        {session.status === "CANCELLED" && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            This session has been cancelled.
+          </div>
+        )}
+
+        {cancelError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {cancelError}
           </div>
         )}
 
@@ -414,8 +464,16 @@ export default function SessionDetailPage() {
               <span className="text-sm text-red-600">{saveError}</span>
             )}
           </div>
-          {canManageAttendance && (
+          {canManageAttendance && session.status !== "CANCELLED" && (
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleCancelSession}
+                disabled={cancelling}
+                className="border border-red-200 text-red-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                {cancelling ? "Cancelling..." : "Cancel session"}
+              </button>
               <button
                 type="button"
                 onClick={handleMarkAttendance}

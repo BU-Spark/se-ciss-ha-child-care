@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
+import { CreateSessionModal } from "@/components/create-session-modal";
 import { PortalNotice } from "@/components/portal-notice";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
@@ -98,7 +99,15 @@ function mapSession(session: ApiSession): StaffSession {
   };
 }
 
-function SessionCard({ session }: { session: StaffSession }) {
+function SessionCard({
+  session,
+  onCancel,
+  cancelling,
+}: {
+  session: StaffSession;
+  onCancel: (sessionId: string) => void;
+  cancelling: boolean;
+}) {
   const router = useRouter();
   const pct = session.capacity > 0 ? (session.registered / session.capacity) * 100 : 0;
   const isNearFull = pct >= 90;
@@ -125,10 +134,23 @@ function SessionCard({ session }: { session: StaffSession }) {
           <div className={`h-full rounded-full ${isNearFull ? "bg-red-500" : "bg-[#1a2f5e]"}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
-      <button onClick={() => router.push(`/ccrr/sessions/${session.id}`)}
-      className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors flex items-center justify-center gap-2">
-      Manage Attendance →
-      </button>
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => router.push(`/ccrr/sessions/${session.id}`)}
+          className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
+        >
+          Manage Attendance →
+        </button>
+        <button
+          type="button"
+          onClick={() => onCancel(session.id)}
+          disabled={cancelling}
+          className="w-full border border-red-200 text-red-700 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {cancelling ? "Cancelling..." : "Cancel session"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -148,6 +170,10 @@ export default function CcrrPage() {
   const [registrationsError, setRegistrationsError] = useState<string | null>(null);
   const [agencyFilter, setAgencyFilter] = useState("All Agencies");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [sessionsKey, setSessionsKey] = useState(0);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [sessionActionError, setSessionActionError] = useState<string | null>(null);
 
   const ccrrNavItems = [
     {
@@ -191,7 +217,40 @@ export default function CcrrPage() {
     if (canLoadData) {
       fetchSessions();
     }
-  }, [canLoadData]);
+  }, [canLoadData, sessionsKey]);
+
+  async function handleCancelSession(sessionId: string) {
+    const confirmed = window.confirm(
+      "Cancel this session? Providers will no longer be able to register, but existing registrations remain on record.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCancellingId(sessionId);
+    setSessionActionError(null);
+
+    try {
+      const res = await fetch(`/api/ccrr/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CANCELLED" }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setSessionActionError(json.error?.message ?? "Unable to cancel session.");
+        return;
+      }
+
+      setSessionsKey((value) => value + 1);
+    } catch {
+      setSessionActionError("Network error. Please try again.");
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   useEffect(() => {
     async function fetchRegistrations() {
@@ -304,16 +363,29 @@ export default function CcrrPage() {
             <p className="font-medium text-[#1a2f5e]">How sessions work</p>
             <p className="mt-1">
               <strong>Providers</strong> register themselves on the Provider portal.
-              <strong> CCR&amp;R staff</strong> manage attendance and export data here — you do not register as a provider.
-              Sessions are published by your agency (demo data is pre-loaded in the database).
+              <strong> CCR&amp;R staff</strong> publish sessions here, manage attendance, and export data.
             </p>
           </div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-zinc-800">Upcoming Sessions</h2>
-            <span className="text-sm text-zinc-500">
-              {loading ? "Loading..." : `${sessions.length} session${sessions.length === 1 ? "" : "s"}`}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-zinc-500">
+                {loading ? "Loading..." : `${sessions.length} session${sessions.length === 1 ? "" : "s"}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="bg-[#1a2f5e] text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
+              >
+                + Add session
+              </button>
+            </div>
           </div>
+          {sessionActionError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {sessionActionError}
+            </div>
+          )}
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <p className="font-medium text-red-800">{error}</p>
@@ -335,10 +407,24 @@ export default function CcrrPage() {
             <div className="text-sm text-zinc-400 py-12 text-center">No upcoming sessions found for your agency.</div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sessions.map((s) => <SessionCard key={s.id} session={s} />)}
+              {sessions.map((session) => (
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  onCancel={handleCancelSession}
+                  cancelling={cancellingId === session.id}
+                />
+              ))}
             </div>
           )}
         </section>
+
+        {showCreateModal && (
+          <CreateSessionModal
+            onClose={() => setShowCreateModal(false)}
+            onSuccess={() => setSessionsKey((value) => value + 1)}
+          />
+        )}
 
         <section id="registrations" className="flex flex-col gap-4">
           <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-zinc-700">
