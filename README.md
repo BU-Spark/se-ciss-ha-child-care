@@ -96,6 +96,7 @@ These routes do not require sign-in (by design):
 - `/`, `/sign-in`, `/sign-up`
 - `GET /api/health`
 - `GET /api/sessions`, `GET /api/sessions/filter-options` (public session listing)
+- `GET /api/cron/daily-digest` (secured with `Authorization: Bearer <CRON_SECRET>` instead of Clerk)
 
 All other API routes and portals require Clerk authentication.
 

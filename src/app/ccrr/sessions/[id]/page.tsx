@@ -295,6 +295,9 @@ export default function SessionDetailPage() {
 
   if (!isLoaded || !userId) return null;
 
+  const canEditAttendance =
+    canManageAttendance && session?.status !== "CANCELLED";
+
   return (
     <PersonaGuardBoundary
       portal="ccrr"
@@ -333,7 +336,7 @@ export default function SessionDetailPage() {
             <h1 className="text-2xl font-bold text-[#1a2f5e]">{session.title}</h1>
             <p className="text-sm text-zinc-500 mt-1">
               {canManageAttendance
-                ? "Manage attendance and session records for active childcare providers."
+                ? "Manage attendance and session records for active early care and education providers."
                 : "View-only: this session is hosted by another CCR&R agency."}
             </p>
           </div>
@@ -405,7 +408,7 @@ export default function SessionDetailPage() {
                     <td className="px-4 py-3 text-zinc-500 font-mono text-xs">{provider.stateProviderId ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-500">{provider.registrationDate}</td>
                     <td className="px-4 py-3">
-                      {canManageAttendance ? (
+                      {canEditAttendance ? (
                         <select
                           value={provider.attendanceStatus}
                           onChange={(e) =>
@@ -431,7 +434,7 @@ export default function SessionDetailPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {canManageAttendance ? (
+                      {canEditAttendance ? (
                         <input
                           type="text"
                           value={provider.notes}
@@ -464,7 +467,7 @@ export default function SessionDetailPage() {
               <span className="text-sm text-red-600">{saveError}</span>
             )}
           </div>
-          {canManageAttendance && session.status !== "CANCELLED" && (
+          {canEditAttendance && (
             <div className="flex items-center gap-3">
               <button
                 type="button"

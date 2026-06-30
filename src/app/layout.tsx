@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EEC Orientation Management",
   description:
-    "Massachusetts child care provider orientation registration and statewide tracking for CCR&R and EEC.",
+    "Massachusetts early care and education provider orientation registration and statewide tracking for CCR&R and EEC.",
 };
 
 export default function RootLayout({
