@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 
 import { PersonaNav } from "@/components/persona-nav";
+import { CreateSessionModal } from "@/components/create-session-modal";
 import { PortalNotice } from "@/components/portal-notice";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
@@ -31,9 +33,42 @@ type ApiSession = {
   spotsLeft: number | null;
 };
 
+type StatewideRegistration = {
+  id: string;
+  providerName: string;
+  organizationName: string;
+  contactEmail: string;
+  stateProviderId: string | null;
+  attendanceLabel: string;
+  registeredAt: string;
+  canManageAttendance: boolean;
+  session: {
+    id: string;
+    title: string;
+    region: string;
+    format: string;
+    startsAt: string;
+    agency: { id: string; name: string; region: string };
+  };
+};
+
+type AgencyOption = {
+  id: string;
+  name: string;
+  region: string;
+};
+
 function formatSessionDate(startsAt: string) {
   return new Date(startsAt).toLocaleDateString("en-US", {
     month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
     day: "numeric",
     year: "numeric",
   });
@@ -64,7 +99,15 @@ function mapSession(session: ApiSession): StaffSession {
   };
 }
 
-function SessionCard({ session }: { session: StaffSession }) {
+function SessionCard({
+  session,
+  onCancel,
+  cancelling,
+}: {
+  session: StaffSession;
+  onCancel: (sessionId: string) => void;
+  cancelling: boolean;
+}) {
   const router = useRouter();
   const pct = session.capacity > 0 ? (session.registered / session.capacity) * 100 : 0;
   const isNearFull = pct >= 90;
@@ -91,10 +134,23 @@ function SessionCard({ session }: { session: StaffSession }) {
           <div className={`h-full rounded-full ${isNearFull ? "bg-red-500" : "bg-[#1a2f5e]"}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
-      <button onClick={() => router.push(`/ccrr/sessions/${session.id}`)}
-      className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors flex items-center justify-center gap-2">
-      Manage Attendance →
-      </button>
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => router.push(`/ccrr/sessions/${session.id}`)}
+          className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
+        >
+          Manage Attendance →
+        </button>
+        <button
+          type="button"
+          onClick={() => onCancel(session.id)}
+          disabled={cancelling}
+          className="w-full border border-red-200 text-red-700 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {cancelling ? "Cancelling..." : "Cancel session"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -108,6 +164,24 @@ export default function CcrrPage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [registrations, setRegistrations] = useState<StatewideRegistration[]>([]);
+  const [agencies, setAgencies] = useState<AgencyOption[]>([]);
+  const [registrationsLoading, setRegistrationsLoading] = useState(true);
+  const [registrationsError, setRegistrationsError] = useState<string | null>(null);
+  const [agencyFilter, setAgencyFilter] = useState("All Agencies");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [sessionsKey, setSessionsKey] = useState(0);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [sessionActionError, setSessionActionError] = useState<string | null>(null);
+
+  const ccrrNavItems = [
+    {
+      label: "Registrations",
+      segment: "registrations",
+      href: (base: string) => `${base}#registrations`,
+    },
+  ];
 
   useEffect(() => {
     async function fetchSessions() {
@@ -143,7 +217,83 @@ export default function CcrrPage() {
     if (canLoadData) {
       fetchSessions();
     }
-  }, [canLoadData]);
+  }, [canLoadData, sessionsKey]);
+
+  async function handleCancelSession(sessionId: string) {
+    const confirmed = window.confirm(
+      "Cancel this session? Providers will no longer be able to register, but existing registrations remain on record.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCancellingId(sessionId);
+    setSessionActionError(null);
+
+    try {
+      const res = await fetch(`/api/ccrr/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CANCELLED" }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setSessionActionError(json.error?.message ?? "Unable to cancel session.");
+        return;
+      }
+
+      setSessionsKey((value) => value + 1);
+    } catch {
+      setSessionActionError("Network error. Please try again.");
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  useEffect(() => {
+    async function fetchRegistrations() {
+      setRegistrationsLoading(true);
+      setRegistrationsError(null);
+
+      try {
+        const params = new URLSearchParams();
+        if (agencyFilter !== "All Agencies") {
+          params.set("agency", agencyFilter);
+        }
+        if (searchQuery.trim()) {
+          params.set("search", searchQuery.trim());
+        }
+
+        const query = params.toString();
+        const res = await fetch(
+          `/api/ccrr/registrations${query ? `?${query}` : ""}`,
+        );
+        const json = await res.json();
+
+        if (!res.ok || !json.success) {
+          setRegistrations([]);
+          setRegistrationsError(
+            json.error?.message ?? "Unable to load statewide registrations.",
+          );
+          return;
+        }
+
+        setRegistrations(json.data.registrations);
+        setAgencies(json.data.agencies);
+      } catch {
+        setRegistrations([]);
+        setRegistrationsError("Network error. Please try again.");
+      } finally {
+        setRegistrationsLoading(false);
+      }
+    }
+
+    if (canLoadData) {
+      fetchRegistrations();
+    }
+  }, [canLoadData, agencyFilter, searchQuery]);
 
   async function handleExport() {
     setExporting(true);
@@ -184,7 +334,11 @@ export default function CcrrPage() {
       portalLabel={portalLabel}
     >
     <div className="min-h-screen bg-zinc-50 flex flex-col">
-      <PersonaNav basePath="/ccrr" subtitle="Welcome, CCR&R Staff" />
+      <PersonaNav
+        basePath="/ccrr"
+        subtitle="Welcome, CCR&R Staff"
+        extraNavItems={ccrrNavItems}
+      />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
         <PortalNotice message={portalNotice} />
         <div className="flex items-start justify-between">
@@ -209,16 +363,29 @@ export default function CcrrPage() {
             <p className="font-medium text-[#1a2f5e]">How sessions work</p>
             <p className="mt-1">
               <strong>Providers</strong> register themselves on the Provider portal.
-              <strong> CCR&amp;R staff</strong> manage attendance and export data here — you do not register as a provider.
-              Sessions are published by your agency (demo data is pre-loaded in the database).
+              <strong> CCR&amp;R staff</strong> publish sessions here, manage attendance, and export data.
             </p>
           </div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-zinc-800">Upcoming Sessions</h2>
-            <span className="text-sm text-zinc-500">
-              {loading ? "Loading..." : `${sessions.length} session${sessions.length === 1 ? "" : "s"}`}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-zinc-500">
+                {loading ? "Loading..." : `${sessions.length} session${sessions.length === 1 ? "" : "s"}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="bg-[#1a2f5e] text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
+              >
+                + Add session
+              </button>
+            </div>
           </div>
+          {sessionActionError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {sessionActionError}
+            </div>
+          )}
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <p className="font-medium text-red-800">{error}</p>
@@ -228,7 +395,7 @@ export default function CcrrPage() {
                     Sign in with your CCR&amp;R staff email, or run:
                   </p>
                   <code className="mt-1 block rounded bg-red-100 px-2 py-1 text-xs text-red-900">
-                    npm run account:link -- ccrr YOUR_CLERK_USER_ID seed-agency-boston deeppatel0306@gmail.com
+                    npm run account:link -- ccrr YOUR_CLERK_USER_ID seed-agency-boston staff@example.com
                   </code>
                 </>
               )}
@@ -240,10 +407,174 @@ export default function CcrrPage() {
             <div className="text-sm text-zinc-400 py-12 text-center">No upcoming sessions found for your agency.</div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sessions.map((s) => <SessionCard key={s.id} session={s} />)}
+              {sessions.map((session) => (
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  onCancel={handleCancelSession}
+                  cancelling={cancellingId === session.id}
+                />
+              ))}
             </div>
           )}
         </section>
+
+        {showCreateModal && (
+          <CreateSessionModal
+            onClose={() => setShowCreateModal(false)}
+            onSuccess={() => setSessionsKey((value) => value + 1)}
+          />
+        )}
+
+        <section id="registrations" className="flex flex-col gap-4">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-zinc-700">
+            <p className="font-medium text-[#1a2f5e]">Statewide registrations (read-only)</p>
+            <p className="mt-1">
+              View registrations across all CCR&amp;R agencies. You can only mark attendance
+              for sessions hosted by your agency — use <strong>Manage attendance</strong> on
+              your own sessions above.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-zinc-800">All Registrations</h2>
+              <p className="text-sm text-zinc-500 mt-0.5">
+                {registrationsLoading
+                  ? "Loading..."
+                  : `${registrations.length} registration${registrations.length === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search provider, program, or agency..."
+                className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e] sm:w-64"
+              />
+              <select
+                value={agencyFilter}
+                onChange={(event) => setAgencyFilter(event.target.value)}
+                className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]"
+              >
+                <option value="All Agencies">All Agencies</option>
+                {agencies.map((agency) => (
+                  <option key={agency.id} value={agency.name}>
+                    {agency.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {registrationsError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {registrationsError}
+            </div>
+          )}
+
+          <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[900px]">
+                <thead>
+                  <tr className="border-b border-zinc-100 bg-zinc-50">
+                    {[
+                      "Provider",
+                      "Program",
+                      "Session",
+                      "Session Date",
+                      "Hosting Agency",
+                      "Attendance",
+                      "Registered",
+                      "",
+                    ].map((heading) => (
+                      <th
+                        key={heading}
+                        className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide"
+                      >
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrationsLoading ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-zinc-400">
+                        Loading registrations...
+                      </td>
+                    </tr>
+                  ) : registrations.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-zinc-400">
+                        No registrations found.
+                      </td>
+                    </tr>
+                  ) : (
+                    registrations.map((registration) => (
+                      <tr
+                        key={registration.id}
+                        className="border-b border-zinc-50 hover:bg-zinc-50 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-zinc-800">{registration.providerName}</p>
+                          <p className="text-xs text-zinc-500">{registration.contactEmail}</p>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">
+                          <p>{registration.organizationName}</p>
+                          {registration.stateProviderId ? (
+                            <p className="text-xs font-mono text-zinc-400">
+                              PID {registration.stateProviderId}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">
+                          <p>{registration.session.title}</p>
+                          <p className="text-xs text-zinc-400">
+                            {registration.session.format} · {registration.session.region}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
+                          {formatShortDate(registration.session.startsAt)}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">
+                          {registration.session.agency.name}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700">
+                            {registration.attendanceLabel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
+                          {formatShortDate(registration.registeredAt)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {registration.canManageAttendance ? (
+                            <Link
+                              href={`/ccrr/sessions/${registration.session.id}`}
+                              className="text-sm font-medium text-[#1a2f5e] hover:underline"
+                            >
+                              Manage attendance
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/ccrr/sessions/${registration.session.id}`}
+                              className="text-sm font-medium text-zinc-500 hover:underline"
+                            >
+                              View only
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <div id="resources" className="border-l-4 border-[#1a2f5e] bg-blue-50 rounded-r-lg px-5 py-4 flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-[#1a2f5e]">Quarterly Reporting Notice</p>
@@ -254,7 +585,7 @@ export default function CcrrPage() {
       </main>
       <footer className="border-t border-zinc-200 bg-white py-4 px-6">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
-          <span>© 2024 Massachusetts Department of Early Education and Care</span>
+          <span>© 2026 Massachusetts Department of Early Education and Care</span>
           <div className="flex gap-4">
             <a href="#" className="hover:text-zinc-600">Accessibility</a>
             <a href="#" className="hover:text-zinc-600">Contact Support</a>

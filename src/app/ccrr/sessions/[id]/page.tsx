@@ -27,6 +27,7 @@ type SessionDetail = {
   format: string;
   facilitator: string;
   totalRegistered: number;
+  status: string;
 };
 
 type ApiRegistration = {
@@ -43,6 +44,7 @@ type ApiSession = {
   id: string;
   title: string;
   format: "VIRTUAL" | "IN_PERSON";
+  status: string;
   startsAt: string;
   endsAt: string;
   locationName: string | null;
@@ -104,6 +106,7 @@ function mapSession(session: ApiSession): SessionDetail {
     ),
     facilitator: session.agency.name,
     totalRegistered: session.registeredCount,
+    status: session.status,
   };
 }
 
@@ -134,6 +137,9 @@ export default function SessionDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [canManageAttendance, setCanManageAttendance] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -167,6 +173,7 @@ export default function SessionDetailPage() {
         const mappedProviders = (json.data.registrations as ApiRegistration[]).map(
           mapRegistration,
         );
+        setCanManageAttendance(json.data.canManageAttendance !== false);
         setSession(mapSession(json.data.session as ApiSession));
         setProviders(mappedProviders);
         setInitialProviders(mappedProviders);
@@ -253,7 +260,43 @@ export default function SessionDetailPage() {
     }
   }
 
+  async function handleCancelSession() {
+    const confirmed = window.confirm(
+      "Cancel this session? Providers will no longer be able to register.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCancelling(true);
+    setCancelError(null);
+
+    try {
+      const res = await fetch(`/api/ccrr/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CANCELLED" }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setCancelError(json.error?.message ?? "Unable to cancel session.");
+        return;
+      }
+
+      router.push("/ccrr#sessions");
+    } catch {
+      setCancelError("Network error. Please try again.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   if (!isLoaded || !userId) return null;
+
+  const canEditAttendance =
+    canManageAttendance && session?.status !== "CANCELLED";
 
   return (
     <PersonaGuardBoundary
@@ -291,7 +334,11 @@ export default function SessionDetailPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2f5e]">{session.title}</h1>
-            <p className="text-sm text-zinc-500 mt-1">Manage attendance and session records for active early care and education providers.</p>
+            <p className="text-sm text-zinc-500 mt-1">
+              {canManageAttendance
+                ? "Manage attendance and session records for active early care and education providers."
+                : "View-only: this session is hosted by another CCR&R agency."}
+            </p>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 flex items-center gap-1.5">
@@ -304,6 +351,25 @@ export default function SessionDetailPage() {
             </div>
           </div>
         </div>
+
+        {!canManageAttendance && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Attendance is read-only for this session. You can only mark attendance for
+            sessions hosted by your agency.
+          </div>
+        )}
+
+        {session.status === "CANCELLED" && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            This session has been cancelled.
+          </div>
+        )}
+
+        {cancelError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {cancelError}
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-4">
           {[
@@ -342,29 +408,45 @@ export default function SessionDetailPage() {
                     <td className="px-4 py-3 text-zinc-500 font-mono text-xs">{provider.stateProviderId ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-500">{provider.registrationDate}</td>
                     <td className="px-4 py-3">
-                      <select
-                        value={provider.attendanceStatus}
-                        onChange={(e) =>
-                          setAttendanceStatus(
-                            provider.id,
-                            e.target.value as Provider["attendanceStatus"],
-                          )
-                        }
-                        className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e]"
-                      >
-                        <option value="NOT_MARKED">Not marked</option>
-                        <option value="ATTENDED">Attended</option>
-                        <option value="NO_SHOW">No-show</option>
-                      </select>
+                      {canEditAttendance ? (
+                        <select
+                          value={provider.attendanceStatus}
+                          onChange={(e) =>
+                            setAttendanceStatus(
+                              provider.id,
+                              e.target.value as Provider["attendanceStatus"],
+                            )
+                          }
+                          className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e]"
+                        >
+                          <option value="NOT_MARKED">Not marked</option>
+                          <option value="ATTENDED">Attended</option>
+                          <option value="NO_SHOW">No-show</option>
+                        </select>
+                      ) : (
+                        <span className="text-xs text-zinc-600">
+                          {provider.attendanceStatus === "ATTENDED"
+                            ? "Attended"
+                            : provider.attendanceStatus === "NO_SHOW"
+                              ? "No-show"
+                              : "Not marked"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <input
-                        type="text"
-                        value={provider.notes}
-                        onChange={(e) => updateNotes(provider.id, e.target.value)}
-                        placeholder="Add note..."
-                        className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e] w-full"
-                      />
+                      {canEditAttendance ? (
+                        <input
+                          type="text"
+                          value={provider.notes}
+                          onChange={(e) => updateNotes(provider.id, e.target.value)}
+                          placeholder="Add note..."
+                          className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e] w-full"
+                        />
+                      ) : (
+                        <span className="text-xs text-zinc-500">
+                          {provider.notes || "—"}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -385,17 +467,27 @@ export default function SessionDetailPage() {
               <span className="text-sm text-red-600">{saveError}</span>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleMarkAttendance}
-              disabled={saving || providers.length === 0}
-              className="flex items-center gap-2 bg-[#1a2f5e] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors disabled:opacity-50"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-              {saving ? "Saving..." : "Mark Attendance"}
-            </button>
-          </div>
+          {canEditAttendance && (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleCancelSession}
+                disabled={cancelling}
+                className="border border-red-200 text-red-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                {cancelling ? "Cancelling..." : "Cancel session"}
+              </button>
+              <button
+                type="button"
+                onClick={handleMarkAttendance}
+                disabled={saving || providers.length === 0}
+                className="flex items-center gap-2 bg-[#1a2f5e] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                {saving ? "Saving..." : "Mark Attendance"}
+              </button>
+            </div>
+          )}
         </div>
 
       </main>
@@ -404,7 +496,7 @@ export default function SessionDetailPage() {
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
           <div>
             <p className="font-medium text-zinc-500">EEC Orientation</p>
-            <p>© 2024 Massachusetts Department of Early Education and Care</p>
+            <p>© 2026 Massachusetts Department of Early Education and Care</p>
           </div>
           <div className="flex gap-4">
             <a href="#" className="hover:text-zinc-600">Accessibility</a>

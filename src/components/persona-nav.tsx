@@ -5,16 +5,23 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 
+type NavItem = {
+  label: string;
+  segment: string;
+  href: (base: string) => string;
+};
+
 type PersonaNavProps = {
   basePath: string;
   subtitle?: string;
+  extraNavItems?: NavItem[];
 };
 
-const NAV_ITEMS = [
+const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", segment: "dashboard", href: (base: string) => base },
   { label: "Sessions", segment: "sessions", href: (base: string) => `${base}#sessions` },
   { label: "Resources", segment: "resources", href: (base: string) => `${base}#resources` },
-] as const;
+];
 
 function getActiveSegment(pathname: string, basePath: string) {
   if (pathname.startsWith(`${basePath}/sessions`)) {
@@ -31,9 +38,10 @@ function scrollToHash(hash: string) {
   }
 }
 
-export function PersonaNav({ basePath, subtitle }: PersonaNavProps) {
+export function PersonaNav({ basePath, subtitle, extraNavItems = [] }: PersonaNavProps) {
   const pathname = usePathname();
   const [hash, setHash] = useState("");
+  const navItems = [...NAV_ITEMS, ...extraNavItems];
 
   useEffect(() => {
     const updateHash = () => setHash(window.location.hash);
@@ -53,7 +61,11 @@ export function PersonaNav({ basePath, subtitle }: PersonaNavProps) {
       ? "sessions"
       : hash === "#resources"
         ? "resources"
-        : getActiveSegment(pathname, basePath);
+        : hash === "#registrations"
+          ? "registrations"
+          : navItems.some((item) => item.segment !== "dashboard" && hash === `#${item.segment}`)
+            ? hash.slice(1)
+            : getActiveSegment(pathname, basePath);
 
   function handleNavClick(
     event: React.MouseEvent<HTMLAnchorElement>,
@@ -86,7 +98,7 @@ export function PersonaNav({ basePath, subtitle }: PersonaNavProps) {
             <span className="font-semibold text-[#1a2f5e] text-sm">EEC Orientation</span>
           </Link>
           <nav className="flex gap-1">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const isActive = item.segment === activeSegment;
               return (
                 <Link

@@ -3,7 +3,6 @@ import { PortalLoading } from "@/components/portal-loading";
 import type { PortalId } from "@/lib/auth/portal-access";
 
 export function PersonaGuardBoundary({
-  portal,
   isReady,
   setupMessage,
   portalLabel,

@@ -33,16 +33,13 @@ export default function Home() {
           <p className="text-sm font-medium text-[#1a2f5e]">Getting started</p>
           <ol className="mt-2 list-decimal pl-5 text-sm text-zinc-600 space-y-1">
             <li>
-              <strong>First time?</strong> Click <strong>Sign up</strong> with your email and create a password.
+              <strong>First time?</strong> Click <strong>Sign up</strong> with your work email and create a password.
             </li>
             <li>
-              <strong>Provider portal:</strong> use <span className="font-mono">deep.patel.0603@gmail.com</span>
+              <strong>Providers</strong> sign up and open the Provider portal to browse and register for sessions.
             </li>
             <li>
-              <strong>CCR&amp;R staff portal:</strong> use <span className="font-mono">deeppatel0306@gmail.com</span>
-            </li>
-            <li>
-              <strong>EEC admin portal:</strong> use <span className="font-mono">deepp03@bu.edu</span>
+              <strong>CCR&amp;R staff</strong> and <strong>EEC administrators</strong> use accounts provisioned by your team administrator.
             </li>
             <li>Already registered? Click <strong>Sign in</strong> instead.</li>
           </ol>
@@ -58,7 +55,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-zinc-200 bg-white py-4 px-6">
         <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
-          <span>© 2024 Massachusetts Department of Early Education and Care</span>
+          <span>© 2026 Massachusetts Department of Early Education and Care</span>
           <div className="flex gap-4">
             <a href="#" className="hover:text-zinc-600">Accessibility</a>
             <a href="#" className="hover:text-zinc-600">Contact Support</a>
