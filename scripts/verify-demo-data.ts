@@ -37,7 +37,7 @@ async function main() {
     }
   }
 
-  const bostonAgencyId = "seed-agency-boston";
+  const bostonAgencyId = "agency-child-care-choices";
   const now = new Date();
 
   const bostonSessions = await prisma.orientationSession.findMany({
@@ -56,9 +56,11 @@ async function main() {
 
   const upcoming = bostonSessions.filter((session) => session.startsAt >= now);
 
-  console.log("\n=== Boston CCR&R sessions (for staff demo) ===\n");
+  console.log("\n=== Child Care Choices of Boston sessions (for CCR&R staff demo) ===\n");
   if (upcoming.length === 0) {
-    console.log("WARN: No upcoming Boston sessions — staff dashboard will be empty.");
+    console.log(
+      "WARN: No upcoming Boston CCR&R sessions — staff dashboard will be empty.",
+    );
   }
 
   for (const session of upcoming) {

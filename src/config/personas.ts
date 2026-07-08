@@ -31,9 +31,9 @@ export const personas: Persona[] = [
     description:
       "Manage registrations and attendance for your agency’s orientation sessions without spreadsheets or phone tag.",
     features: [
-      "View registrations for your sessions only",
-      "Mark attendance and track completion",
-      "Session summaries and automated follow-up emails",
+      "Publish sessions and manage attendance for your agency",
+      "Manage attendance rosters for your agency",
+      "Export attendance data for compliance reporting",
     ],
   },
   {

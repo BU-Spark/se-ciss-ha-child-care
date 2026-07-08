@@ -3,7 +3,7 @@
 Web application for Massachusetts Early Education and Care (EEC) orientation registration and statewide tracking. Supports three portals:
 
 - **Providers** — browse sessions, register, manage registrations
-- **CCR&R staff** — manage attendance, view statewide registrations, export data
+- **CCR&R staff** — publish sessions, manage attendance, export agency data
 - **EEC administrators** — statewide analytics and CSV reporting
 
 ## Tech stack
@@ -41,8 +41,8 @@ After signing up in Clerk, link the account to the database:
 # Provider
 npm run account:link -- provider <clerkUserId> provider@example.com
 
-# CCR&R staff (requires agency id from seed)
-npm run account:link -- ccrr <clerkUserId> seed-agency-boston staff@example.com
+# CCR&R staff (requires agency id from seed — e.g. agency-child-care-choices)
+npm run account:link -- ccrr <clerkUserId> agency-child-care-choices staff@example.com
 
 # EEC admin
 npm run account:link -- eec <clerkUserId> admin@example.com

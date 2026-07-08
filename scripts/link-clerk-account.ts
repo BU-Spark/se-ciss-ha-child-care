@@ -7,12 +7,36 @@ import { isPlaceholderClerkUserId } from "../src/lib/auth/link-app-user";
 const prisma = new PrismaClient();
 
 const AGENCIES = [
-  { id: "agency-child-care-circuit", name: "Child Care Circuit", region: "Northeast" },
-  { id: "agency-seven-hills", name: "Seven Hills Family Services", region: "Central" },
-  { id: "agency-eec-boston", name: "EEC Boston Office", region: "Boston" },
-  { id: "seed-agency-boston", name: "Boston Child Care Resource Center", region: "Boston" },
-  { id: "seed-agency-northeast", name: "Northeast Family Support Agency", region: "Northeast" },
-  { id: "seed-agency-western", name: "Western MA Early Learning Network", region: "Western Massachusetts" },
+  {
+    id: "agency-child-care-choices",
+    name: "Child Care Choices of Boston",
+    region: "Metro Boston",
+  },
+  {
+    id: "agency-child-care-network",
+    name: "Child Care Network",
+    region: "Cape and Islands",
+  },
+  {
+    id: "agency-child-care-circuit",
+    name: "Child Care Circuit",
+    region: "Northeast",
+  },
+  {
+    id: "agency-community-care-for-kids",
+    name: "Community Care for Kids",
+    region: "Metro South",
+  },
+  {
+    id: "agency-child-care-works",
+    name: "Child Care Works",
+    region: "Southeast",
+  },
+  {
+    id: "agency-seven-hills",
+    name: "Seven Hills Child Care Resources",
+    region: "Central",
+  },
 ] as const;
 
 function printUsage() {
@@ -29,7 +53,7 @@ Roles:
 
 Examples:
   npm run account:link -- provider user_2abc123 provider@example.com
-  npm run account:link -- ccrr user_2abc123 seed-agency-boston staff@example.com
+  npm run account:link -- ccrr user_2abc123 agency-child-care-choices staff@example.com
   npm run account:link -- eec user_2abc123 eec.admin@example.com
 
 Agency options:

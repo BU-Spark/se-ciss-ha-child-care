@@ -43,13 +43,17 @@ export async function GET(
       throw ApiError.notFound("Session not found");
     }
 
-    const canManageAttendance =
-      profile.role === "EEC_ADMIN" ||
-      (profile.role === "CCRR_STAFF" &&
-        session.agencyId === requireCcrrAgencyId(profile));
+    if (
+      profile.role === "CCRR_STAFF" &&
+      session.agencyId !== requireCcrrAgencyId(profile)
+    ) {
+      throw ApiError.forbidden(
+        "You can only view registrations for sessions hosted by your agency",
+      );
+    }
 
     return jsonSuccess({
-      canManageAttendance,
+      canManageAttendance: true,
       session: {
         id: session.id,
         title: session.title,

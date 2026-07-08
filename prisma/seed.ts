@@ -10,23 +10,45 @@ import {
 
 const prisma = new PrismaClient();
 
+/** Official EEC CCR&R agencies (Kate Giapponi Schneider, June 2026). */
 const agencies = [
-  { id: "agency-child-care-circuit", name: "Child Care Circuit", region: "Northeast" },
-  { id: "agency-seven-hills", name: "Seven Hills Family Services", region: "Central" },
-  { id: "agency-eec-boston", name: "EEC Boston Office", region: "Boston" },
-  { id: "agency-pace-cc", name: "Pace CC", region: "Southeast" },
-  { id: "agency-valley-opp", name: "Valley Opportunity Council", region: "Western" },
-  { id: "agency-child-care-choices", name: "Child Care Choices", region: "Metro Boston" },
-  { id: "seed-agency-boston", name: "Boston Child Care Resource Center", region: "Boston" },
-  { id: "seed-agency-northeast", name: "Northeast Family Support Agency", region: "Northeast" },
-  { id: "seed-agency-western", name: "Western MA Early Learning Network", region: "Western Massachusetts" },
+  {
+    id: "agency-child-care-choices",
+    name: "Child Care Choices of Boston",
+    region: "Metro Boston",
+  },
+  {
+    id: "agency-child-care-network",
+    name: "Child Care Network",
+    region: "Cape and Islands",
+  },
+  {
+    id: "agency-child-care-circuit",
+    name: "Child Care Circuit",
+    region: "Northeast",
+  },
+  {
+    id: "agency-community-care-for-kids",
+    name: "Community Care for Kids",
+    region: "Metro South",
+  },
+  {
+    id: "agency-child-care-works",
+    name: "Child Care Works",
+    region: "Southeast",
+  },
+  {
+    id: "agency-seven-hills",
+    name: "Seven Hills Child Care Resources",
+    region: "Central",
+  },
 ];
 
 const sessions = [
   {
     id: "session-eec-orientation-2026-06-14",
     agencyId: "agency-child-care-circuit",
-    title: "EEC Mandatory Orientation",
+    title: "Voucher Orientation Session",
     region: "Northeast",
     format: SessionFormat.VIRTUAL,
     startsAt: new Date("2026-06-14T14:00:00.000Z"),
@@ -38,21 +60,21 @@ const sessions = [
   {
     id: "session-licensing-review-2026-06-21",
     agencyId: "agency-seven-hills",
-    title: "Licensing Regulation Review",
+    title: "Voucher Orientation Session",
     region: "Central",
     format: SessionFormat.IN_PERSON,
     startsAt: new Date("2026-06-21T17:00:00.000Z"),
     endsAt: new Date("2026-06-21T19:30:00.000Z"),
     capacity: 25,
-    locationName: "Seven Hills Family Services",
-    address: "Worcester, MA",
+    locationName: "Seven Hills Child Care Resources",
+    address: "799 West Boylston St., Worcester, MA 01606",
     language: "es",
   },
   {
     id: "session-health-safety-2026-06-28",
-    agencyId: "agency-eec-boston",
-    title: "Health and Safety Essentials",
-    region: "Boston",
+    agencyId: "agency-child-care-choices",
+    title: "Voucher Orientation Session",
+    region: "Metro Boston",
     format: SessionFormat.VIRTUAL,
     startsAt: new Date("2026-06-28T13:00:00.000Z"),
     endsAt: new Date("2026-06-28T15:30:00.000Z"),
@@ -62,10 +84,10 @@ const sessions = [
   },
   {
     id: "seed-session-boston-virtual",
-    agencyId: "seed-agency-boston",
-    title: "Family Child Care Orientation",
+    agencyId: "agency-child-care-choices",
+    title: "Voucher Orientation Session",
     description: "Introductory orientation for new family child care providers.",
-    region: "Boston",
+    region: "Metro Boston",
     format: SessionFormat.VIRTUAL,
     startsAt: new Date("2026-06-20T14:00:00.000Z"),
     endsAt: new Date("2026-06-20T16:00:00.000Z"),
@@ -75,23 +97,24 @@ const sessions = [
   },
   {
     id: "seed-session-boston-person",
-    agencyId: "seed-agency-boston",
-    title: "Group Child Care Licensing Basics",
-    description: "In-person session covering licensing steps and required documents.",
-    region: "Boston",
+    agencyId: "agency-child-care-choices",
+    title: "Voucher Orientation Session",
+    description: "In-person session at Child Care Choices of Boston.",
+    region: "Metro Boston",
     format: SessionFormat.IN_PERSON,
     startsAt: new Date("2026-06-27T13:00:00.000Z"),
     endsAt: new Date("2026-06-27T16:00:00.000Z"),
     capacity: 25,
-    locationName: "100 Cambridge Street, Boston, MA",
+    locationName: "Child Care Choices of Boston",
+    address: "105 Chauncy St., Boston, MA 02111",
     language: "en",
   },
   {
     id: "seed-session-boston-summer",
-    agencyId: "seed-agency-boston",
-    title: "Summer Health & Safety Refresher",
-    description: "Required annual health and safety training for Boston-area providers.",
-    region: "Boston",
+    agencyId: "agency-child-care-choices",
+    title: "Voucher Orientation Session",
+    description: "Virtual voucher orientation hosted by Child Care Choices of Boston.",
+    region: "Metro Boston",
     format: SessionFormat.VIRTUAL,
     startsAt: new Date("2026-07-10T15:00:00.000Z"),
     endsAt: new Date("2026-07-10T17:00:00.000Z"),
@@ -101,8 +124,8 @@ const sessions = [
   },
   {
     id: "seed-session-northeast-virtual",
-    agencyId: "seed-agency-northeast",
-    title: "Provider Orientation: Northeast Region",
+    agencyId: "agency-child-care-circuit",
+    title: "Voucher Orientation Session",
     description: "Virtual orientation for providers in the Northeast region.",
     region: "Northeast",
     format: SessionFormat.VIRTUAL,
@@ -114,15 +137,16 @@ const sessions = [
   },
   {
     id: "seed-session-western-past",
-    agencyId: "seed-agency-western",
-    title: "Western MA Provider Orientation",
+    agencyId: "agency-child-care-works",
+    title: "Voucher Orientation Session",
     description: "Completed test session with attendance data.",
-    region: "Western Massachusetts",
+    region: "Southeast",
     format: SessionFormat.IN_PERSON,
     startsAt: new Date("2026-05-23T14:00:00.000Z"),
     endsAt: new Date("2026-05-23T16:00:00.000Z"),
     capacity: 20,
-    locationName: "Springfield Public Library, Springfield, MA",
+    locationName: "Child Care Works",
+    address: "134 S 2nd St., New Bedford, MA 02740",
     language: "ht",
   },
 ];
@@ -240,7 +264,7 @@ const staffUsers = [
     email: "ccrr.boston@example.com",
     name: "Lisa Park",
     role: UserRole.CCRR_STAFF,
-    agencyId: "agency-eec-boston",
+    agencyId: "agency-child-care-choices",
     clerkUserId: process.env.SEED_CCRR_BOSTON_CLERK_USER_ID ?? null,
   },
   {
@@ -256,7 +280,7 @@ const staffUsers = [
     email: "deeppatel0306@gmail.com",
     name: "Deep Patel",
     role: UserRole.CCRR_STAFF,
-    agencyId: "seed-agency-boston",
+    agencyId: "agency-child-care-choices",
     clerkUserId: process.env.SEED_BOSTON_RESOURCE_CLERK_USER_ID ?? null,
   },
   {
@@ -264,7 +288,7 @@ const staffUsers = [
     email: "staff.northeast@example.com",
     name: "Northeast CCR&R Staff",
     role: UserRole.CCRR_STAFF,
-    agencyId: "seed-agency-northeast",
+    agencyId: "agency-child-care-circuit",
     clerkUserId: process.env.SEED_NORTHEAST_RESOURCE_CLERK_USER_ID ?? null,
   },
   {
@@ -646,6 +670,32 @@ async function main() {
     });
   }
 
+  // Retire demo / non-EEC agencies so filters and admin counts match client list.
+  const officialAgencyIds = agencies.map((agency) => agency.id);
+  await prisma.agency.updateMany({
+    where: { id: { notIn: officialAgencyIds } },
+    data: { isActive: false },
+  });
+
+  // Move any leftover sessions still tied to retired agencies onto the official Boston CCR&R.
+  await prisma.orientationSession.updateMany({
+    where: { agencyId: { notIn: officialAgencyIds } },
+    data: { agencyId: "agency-child-care-choices", region: "Metro Boston" },
+  });
+
+  await prisma.staffUser.updateMany({
+    where: {
+      role: UserRole.CCRR_STAFF,
+      agencyId: { notIn: officialAgencyIds },
+    },
+    data: { agencyId: "agency-child-care-choices" },
+  });
+
+  await prisma.orientationSession.updateMany({
+    where: { title: "CCFA Orientation" },
+    data: { title: "Voucher Orientation Session" },
+  });
+
   for (const session of sessions) {
     await prisma.orientationSession.upsert({
       where: { id: session.id },
@@ -728,7 +778,7 @@ async function main() {
     "\n  Provider:  deep.patel.0603@gmail.com  -> /provider",
     "\n  CCR&R:     deeppatel0306@gmail.com     -> /ccrr",
     "\n  EEC Admin: deepp03@bu.edu               -> /eec",
-    "\n\nBoston CCR&R demo data:",
+    "\n\nChild Care Choices demo data:",
     "\n  3 upcoming sessions with registrants (virtual, in-person, summer refresher)",
     "\n  Run: npm run demo:verify",
   );

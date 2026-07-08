@@ -27,7 +27,7 @@ export async function GET() {
           },
         },
         select: { id: true, name: true, region: true },
-        orderBy: { name: "asc" },
+        orderBy: [{ region: "asc" }, { name: "asc" }],
       }),
       prisma.orientationSession.findMany({
         where: {

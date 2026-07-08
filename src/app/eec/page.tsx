@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth, UserButton } from "@clerk/nextjs";
 
 import { PortalNotice } from "@/components/portal-notice";
+import { SiteFooter } from "@/components/site-footer";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
 import { escapeCSV, buildCsv, downloadCsv } from "@/lib/csv";
@@ -86,6 +87,7 @@ function formatSessionDate(iso: string) {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "America/New_York",
   });
 }
 
@@ -121,12 +123,13 @@ function formatAuditTimestamp(iso: string) {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "America/New_York",
   });
 }
 
 function StatsCards({ stats }: { stats: EecStats | null }) {
   return (
-    <div className="grid grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {[
         {
           label: "TOTAL REGISTRATIONS",
@@ -418,24 +421,34 @@ export default function EecPage() {
     >
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       <header className="border-b border-[#e2e6ed] bg-white sticky top-0 z-10">
-        <div className="flex items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded bg-[#1a2f5e] flex items-center justify-center text-white text-xs font-bold">M</div>
-            <div>
-              <p className="text-sm font-semibold text-[#1a2f5e] leading-tight">EEC Admin</p>
-              <p className="text-xs text-zinc-400 leading-tight">Statewide Access</p>
+        <div className="flex flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded bg-[#1a2f5e] flex items-center justify-center text-white text-xs font-bold">M</div>
+              <div>
+                <p className="text-sm font-semibold text-[#1a2f5e] leading-tight">EEC Admin</p>
+                <p className="text-xs text-zinc-400 leading-tight">Statewide Access</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 lg:hidden">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium text-zinc-800">{adminName}</p>
+                <p className="text-xs text-zinc-400">State Administrator</p>
+              </div>
+              <UserButton />
             </div>
           </div>
-          <div className="flex-1 max-w-xs mx-8">
+          <div className="w-full lg:max-w-xs lg:mx-8 lg:flex-1">
             <input
-              type="text"
+              type="search"
               placeholder="Search providers or agencies..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-3 pr-3 py-1.5 text-sm border border-zinc-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]"
+              aria-label="Search providers or agencies"
             />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <div className="text-right">
               <p className="text-sm font-medium text-zinc-800">{adminName}</p>
               <p className="text-xs text-zinc-400">State Administrator</p>
@@ -444,14 +457,15 @@ export default function EecPage() {
           </div>
         </div>
       </header>
-      <div className="flex flex-1">
-        <aside className="w-52 bg-white border-r border-zinc-200 flex flex-col py-4 flex-shrink-0">
-          <nav className="flex flex-col gap-0.5 px-2 flex-1">
+      <div className="flex flex-1 flex-col lg:flex-row">
+        <aside className="lg:w-52 bg-white border-b lg:border-b-0 lg:border-r border-zinc-200 flex flex-col py-3 lg:py-4 flex-shrink-0">
+          <nav className="flex lg:flex-col gap-1 px-2 overflow-x-auto lg:overflow-visible" aria-label="EEC admin">
             {NAV_ITEMS.map((item) => (
               <button
                 key={item}
+                type="button"
                 onClick={() => setActiveNav(item)}
-                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-left ${
+                className={`flex items-center whitespace-nowrap px-3 py-2 rounded-md text-sm font-medium transition-colors text-left ${
                   activeNav === item ? "bg-[#1a2f5e] text-white" : "text-zinc-600 hover:bg-zinc-50"
                 }`}
               >
@@ -459,8 +473,9 @@ export default function EecPage() {
               </button>
             ))}
           </nav>
-          <div className="px-2 flex flex-col gap-1 mt-4 border-t border-zinc-100 pt-4">
+          <div className="px-2 flex flex-col gap-1 mt-3 lg:mt-4 border-t border-zinc-100 pt-3 lg:pt-4">
             <button
+              type="button"
               onClick={exportCsv}
               className="w-full bg-[#1a2f5e] text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
             >
@@ -468,15 +483,15 @@ export default function EecPage() {
             </button>
           </div>
         </aside>
-        <main className="flex-1 px-6 py-6 flex flex-col gap-6 overflow-auto">
+        <main className="flex-1 px-4 sm:px-6 py-6 flex flex-col gap-6 overflow-auto">
           <PortalNotice message={portalNotice} />
           <h1 className="text-xl font-bold text-[#1a2f5e]">{pageTitle}</h1>
 
           {activeNav === "Overview" && (
             <>
               <StatsCards stats={stats} />
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <div className="xl:col-span-2">
                   <TrendChart trend={trend} maxTrend={maxTrend} />
                 </div>
                 <RegionalCompletionPanel regionalRates={regionalRates} />
@@ -540,6 +555,7 @@ export default function EecPage() {
                     {error}
                   </div>
                 )}
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-100 bg-zinc-50">
@@ -597,6 +613,7 @@ export default function EecPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
                 <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100">
                   <p className="text-xs text-zinc-400">
                     Showing {filteredRegistrations.length} registration{filteredRegistrations.length === 1 ? "" : "s"}
@@ -621,6 +638,7 @@ export default function EecPage() {
                 <div className="px-4 py-3 border-b border-zinc-100">
                   <p className="text-sm font-semibold text-zinc-800">Completion by Region</p>
                 </div>
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-100 bg-zinc-50">
@@ -653,6 +671,7 @@ export default function EecPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </>
           )}
@@ -666,6 +685,7 @@ export default function EecPage() {
                 <div className="px-4 py-3 border-b border-zinc-100">
                   <p className="text-sm font-semibold text-zinc-800">CCR&amp;R Agency Summary</p>
                 </div>
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-100 bg-zinc-50">
@@ -707,6 +727,7 @@ export default function EecPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </>
           )}
@@ -718,6 +739,7 @@ export default function EecPage() {
                   <p className="text-sm font-semibold text-zinc-800">Recent Activity</p>
                   <p className="text-xs text-zinc-400 mt-0.5">Registration and attendance changes across all agencies</p>
                 </div>
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-100 bg-zinc-50">
@@ -753,21 +775,13 @@ export default function EecPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </>
           )}
         </main>
       </div>
-      <footer className="border-t border-zinc-200 bg-white py-3 px-6">
-        <div className="flex items-center justify-between text-xs text-zinc-400">
-          <span>© 2026 Massachusetts Department of Early Education and Care</span>
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-zinc-600">Privacy Policy</a>
-            <a href="#" className="hover:text-zinc-600">Terms of Service</a>
-            <a href="#" className="hover:text-zinc-600">Accessibility Statement</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
     </PersonaGuardBoundary>
   );
