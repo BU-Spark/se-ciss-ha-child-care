@@ -4,7 +4,7 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api/errors";
 import { isSupportedLanguage } from "@/lib/languages";
 
-export const DEFAULT_SESSION_TITLE = "CCFA Orientation";
+export const DEFAULT_SESSION_TITLE = "Voucher Orientation Session";
 
 export const createSessionSchema = z
   .object({

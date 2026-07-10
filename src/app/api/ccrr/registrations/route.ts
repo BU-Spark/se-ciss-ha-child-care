@@ -37,21 +37,12 @@ export async function GET(request: Request) {
     const staffAgencyId = requireCcrrAgencyId(profile);
 
     const { searchParams } = new URL(request.url);
-    const agency = searchParams.get("agency");
     const search = searchParams.get("search")?.trim();
 
     const registrations = await prisma.registration.findMany({
       where: {
         ...rosterRegistrationStatusFilter,
-        ...(agency && agency !== "All Agencies"
-          ? {
-              session: {
-                agency: {
-                  name: { equals: agency, mode: "insensitive" },
-                },
-              },
-            }
-          : {}),
+        session: { agencyId: staffAgencyId },
         ...(search
           ? {
               OR: [
@@ -110,7 +101,7 @@ export async function GET(request: Request) {
     });
 
     const agencies = await prisma.agency.findMany({
-      where: { isActive: true },
+      where: { id: staffAgencyId, isActive: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true, region: true },
     });

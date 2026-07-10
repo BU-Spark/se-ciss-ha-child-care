@@ -7,7 +7,9 @@ import { useAuth } from "@clerk/nextjs";
 import { PersonaNav } from "@/components/persona-nav";
 import { PortalNotice } from "@/components/portal-notice";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
+import { SiteFooter } from "@/components/site-footer";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
+import { formatAppDate, formatAppTimeRange } from "@/lib/datetime";
 
 type Provider = {
   id: string;
@@ -54,27 +56,15 @@ type ApiSession = {
 };
 
 function formatSessionDate(startsAt: string) {
-  return new Date(startsAt).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatAppDate(startsAt);
 }
 
 function formatSessionTime(startsAt: string, endsAt: string) {
-  const start = new Date(startsAt).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  const end = new Date(endsAt).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return `${start} - ${end}`;
+  return formatAppTimeRange(startsAt, endsAt);
 }
 
 function formatRegistrationDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+  return formatAppDate(iso, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -137,7 +127,7 @@ export default function SessionDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [canManageAttendance, setCanManageAttendance] = useState(true);
+  const [canManageAttendance, setCanManageAttendance] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
@@ -173,7 +163,7 @@ export default function SessionDetailPage() {
         const mappedProviders = (json.data.registrations as ApiRegistration[]).map(
           mapRegistration,
         );
-        setCanManageAttendance(json.data.canManageAttendance !== false);
+        setCanManageAttendance(json.data.canManageAttendance === true);
         setSession(mapSession(json.data.session as ApiSession));
         setProviders(mappedProviders);
         setInitialProviders(mappedProviders);
@@ -331,7 +321,7 @@ export default function SessionDetailPage() {
           <span className="text-zinc-600 font-medium">Session Details</span>
         </div>
 
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2f5e]">{session.title}</h1>
             <p className="text-sm text-zinc-500 mt-1">
@@ -340,13 +330,11 @@ export default function SessionDetailPage() {
                 : "View-only: this session is hosted by another CCR&R agency."}
             </p>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
               FORMAT: <span className="font-semibold text-zinc-800">{session.format}</span>
             </div>
             <div className="border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               TOTAL: <span className="font-semibold text-zinc-800">{session.totalRegistered} Registered</span>
             </div>
           </div>
@@ -371,10 +359,10 @@ export default function SessionDetailPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: "DATE", value: session.date },
-            { label: "TIME", value: session.time },
+            { label: "TIME (ET)", value: session.time },
             { label: "FACILITATOR", value: session.facilitator },
           ].map(({ label, value }) => (
             <div key={label} className="bg-white border border-zinc-200 rounded-lg px-5 py-4">
@@ -385,7 +373,8 @@ export default function SessionDetailPage() {
         </div>
 
         <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
                 {["Provider Name", "Email", "PID", "Registration Date", "Attendance", "Notes"].map((h) => (
@@ -453,6 +442,7 @@ export default function SessionDetailPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         <div className="flex items-center justify-between">
@@ -492,19 +482,7 @@ export default function SessionDetailPage() {
 
       </main>
 
-      <footer className="border-t border-zinc-200 bg-white py-4 px-6">
-        <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
-          <div>
-            <p className="font-medium text-zinc-500">EEC Orientation</p>
-            <p>© 2026 Massachusetts Department of Early Education and Care</p>
-          </div>
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-zinc-600">Accessibility</a>
-            <a href="#" className="hover:text-zinc-600">Contact Support</a>
-            <a href="#" className="hover:text-zinc-600">Privacy Policy</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   )}
     </PersonaGuardBoundary>

@@ -26,24 +26,25 @@ export function usePersonaGuard(portal: PortalId) {
   const router = useRouter();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const [isReady, setIsReady] = useState(false);
-  const [notice] = useState<string | null>(() => {
-    if (typeof window === "undefined") {
-      return null;
-    }
-
-    return new URLSearchParams(window.location.search).get("portalNotice");
-  });
+  const [notice, setNotice] = useState<string | null>(null);
   const [setupMessage, setSetupMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (!params.has("portalNotice")) {
+    const portalNotice = params.get("portalNotice");
+    if (!portalNotice) {
       return;
     }
 
-    const url = new URL(window.location.href);
-    url.searchParams.delete("portalNotice");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    // Defer so SSR and first client paint both start with null (no hydration mismatch).
+    const frame = window.requestAnimationFrame(() => {
+      setNotice(portalNotice);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("portalNotice");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {

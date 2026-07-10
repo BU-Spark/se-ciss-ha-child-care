@@ -6,7 +6,16 @@ import { useAuth } from "@clerk/nextjs";
 import { PersonaNav } from "@/components/persona-nav";
 import { PortalNotice } from "@/components/portal-notice";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
+import { ModalShell } from "@/components/modal-shell";
+import { ResourcesSection } from "@/components/resources-section";
+import { SiteFooter } from "@/components/site-footer";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
+import {
+  addDaysToDateString,
+  appTodayDateString,
+  formatAppDate,
+  formatAppTimeRange,
+} from "@/lib/datetime";
 import { getLanguageLabel, SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,23 +78,14 @@ const PROVIDER_TYPES = [
 ];
 
 function formatDateLabel(iso: string) {
-  const date = new Date(iso);
   return {
-    month: date.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
-    day: date.getDate().toString(),
+    month: formatAppDate(iso, { month: "short" }).toUpperCase(),
+    day: formatAppDate(iso, { day: "numeric" }),
   };
 }
 
 function formatSessionTime(startsAt: string, endsAt: string) {
-  const start = new Date(startsAt).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  const end = new Date(endsAt).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return `${start} – ${end}`;
+  return formatAppTimeRange(startsAt, endsAt);
 }
 
 function formatSessionFormat(
@@ -100,7 +100,7 @@ function formatSessionFormat(
 }
 
 function registrationStatusLabel(status: string) {
-  if (status === "WAITLISTED") return "Pending";
+  if (status === "WAITLISTED") return "Waitlisted";
   if (status === "ATTENDED") return "Attended";
   if (status === "NO_SHOW") return "No-show";
   if (status === "CANCELLED") return "Cancelled";
@@ -120,16 +120,13 @@ function getDateRangeParams(dateRange: string) {
     return {};
   }
 
-  const today = new Date();
-  const format = (date: Date) => date.toISOString().slice(0, 10);
+  const today = appTodayDateString();
   const days =
     dateRange === "Next 7 days" ? 7 : dateRange === "Next 30 days" ? 30 : 90;
-  const end = new Date(today);
-  end.setUTCDate(end.getUTCDate() + days + 1);
 
   return {
-    from: format(today),
-    to: format(end),
+    from: today,
+    to: addDaysToDateString(today, days + 1),
   };
 }
 
@@ -349,112 +346,99 @@ function RegistrationModal({
     }
   }
 
-  const sessionDate = new Date(session.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  const sessionTime = `${new Date(session.startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${new Date(session.endsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+  const sessionDate = formatAppDate(session.startsAt);
+  const sessionTime = formatAppTimeRange(session.startsAt, session.endsAt);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-zinc-100">
-          <div>
-            <p className="text-xs text-zinc-400 mb-1">Sessions › Registration</p>
-            <h2 className="text-xl font-bold text-[#1a2f5e]">Session Registration: {session.title}</h2>
-            <p className="text-sm text-zinc-500 mt-1">Please complete the form below to secure your attendance.</p>
+    <ModalShell
+      title={`Session Registration: ${session.title}`}
+      description="Complete the form below to secure your attendance."
+      onClose={onClose}
+      size="xl"
+      footer={
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="w-full sm:w-auto bg-[#1a2f5e] text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {submitting ? "Submitting..." : "Complete Registration"}
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="flex-1 flex flex-col gap-5 min-w-0">
+          <div className="border border-zinc-200 rounded-lg p-4 flex flex-col gap-4">
+            <h3 className="font-semibold text-zinc-800">Registration Details</h3>
+            <ProgramLookup onSelect={handleProgramSelect} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-zinc-600">Provider Name</label>
+                <input name="providerName" value={form.providerName} onChange={handleChange} placeholder="Your full name" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-zinc-600">Organization Name</label>
+                <input name="organizationName" value={form.organizationName} onChange={handleChange} placeholder="Your organization" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-zinc-600">Contact Email</label>
+                <input name="contactEmail" value={form.contactEmail} onChange={handleChange} type="email" placeholder="email@example.com" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-zinc-600">Phone Number</label>
+                <input name="phone" value={form.phone} onChange={handleChange} placeholder="(555) 000-0000" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-zinc-600">Provider Type</label>
+                <select name="providerType" value={form.providerType} onChange={handleChange} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
+                  {PROVIDER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-zinc-600">Preferred Language</label>
+                <select name="preferredLanguage" value={form.preferredLanguage} onChange={handleChange} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
+                  {SUPPORTED_LANGUAGES.map((language) => (
+                    <option key={language.code} value={language.code}>{language.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 ml-4 flex-shrink-0">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 flex gap-2">
+            <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
+            <p className="text-xs text-blue-700">After you register, session details will appear in My Registrations below.</p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">{error}</div>
+          )}
         </div>
 
-        <div className="flex gap-6 p-6">
-          {/* Form */}
-          <div className="flex-1 flex flex-col gap-5">
-            {/* Registration Details */}
-            <div className="border border-zinc-200 rounded-lg p-4 flex flex-col gap-4">
-              <h3 className="font-semibold text-zinc-800">Registration Details</h3>
-              <ProgramLookup onSelect={handleProgramSelect} />
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-600">Provider Name</label>
-                  <input name="providerName" value={form.providerName} onChange={handleChange} placeholder="Your full name" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-600">Organization Name</label>
-                  <input name="organizationName" value={form.organizationName} onChange={handleChange} placeholder="Your organization" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-600">Contact Email</label>
-                  <input name="contactEmail" value={form.contactEmail} onChange={handleChange} type="email" placeholder="email@example.com" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-600">Phone Number</label>
-                  <input name="phone" value={form.phone} onChange={handleChange} placeholder="(555) 000-0000" className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]" />
-                </div>
+        <aside className="w-full lg:w-48 flex-shrink-0 flex flex-col gap-3">
+          <div className="border border-zinc-200 rounded-lg p-4 flex flex-col gap-3 bg-zinc-50">
+            <h3 className="font-semibold text-zinc-800 text-sm">Session Summary</h3>
+            <div className="flex flex-col gap-2 text-xs text-zinc-600">
+              <div>
+                <p className="text-zinc-400 mb-0.5">Date</p>
+                <p className="font-medium">{sessionDate}</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-600">Provider Type</label>
-                  <select name="providerType" value={form.providerType} onChange={handleChange} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
-                    {PROVIDER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-600">Preferred Language</label>
-                  <select name="preferredLanguage" value={form.preferredLanguage} onChange={handleChange} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
-                    {SUPPORTED_LANGUAGES.map((language) => (
-                      <option key={language.code} value={language.code}>{language.label}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <p className="text-zinc-400 mb-0.5">Time (ET)</p>
+                <p className="font-medium">{sessionTime}</p>
+              </div>
+              <div>
+                <p className="text-zinc-400 mb-0.5">Location</p>
+                <p className="font-medium">{session.format === "VIRTUAL" ? "Virtual (link after registration)" : session.locationName ?? "In-person"}</p>
               </div>
             </div>
-
-            {/* Auto confirmation notice */}
-            <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 flex gap-2">
-              <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
-              <p className="text-xs text-blue-700">After you register, session details will appear in My Registrations below.</p>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">{error}</div>
-            )}
-
-            {/* Submit */}
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="w-full bg-[#1a2f5e] text-white py-2.5 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? "Submitting..." : "Complete Registration"}
-            </button>
           </div>
-
-          {/* Session Summary Sidebar */}
-          <div className="w-44 flex-shrink-0 flex flex-col gap-3">
-            <div className="border border-zinc-200 rounded-lg p-4 flex flex-col gap-3">
-              <h3 className="font-semibold text-zinc-800 text-sm">Session Summary</h3>
-              <div className="flex flex-col gap-2 text-xs text-zinc-600">
-                <div>
-                  <p className="text-zinc-400 mb-0.5">Date</p>
-                  <p className="font-medium">{sessionDate}</p>
-                </div>
-                <div>
-                  <p className="text-zinc-400 mb-0.5">Time</p>
-                  <p className="font-medium">{sessionTime}</p>
-                </div>
-                <div>
-                  <p className="text-zinc-400 mb-0.5">Location</p>
-                  <p className="font-medium">{session.format === "VIRTUAL" ? "Virtual (Link provided after registration)" : session.locationName ?? "In-person"}</p>
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">Registration closes 24 hours prior to the session start time. For assistance, contact our support team.</p>
-          </div>
-        </div>
+          <p className="text-xs text-zinc-400 leading-relaxed">Session details and Zoom links appear in My Registrations after you register. Registration closes when the session starts.</p>
+        </aside>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -462,22 +446,32 @@ function RegistrationModal({
 
 function SuccessModal({ session, onClose }: { session: Session; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-8 flex flex-col items-center gap-4 text-center">
+    <ModalShell
+      title="You're registered!"
+      description={`You've successfully registered for ${session.title}.`}
+      onClose={onClose}
+      size="md"
+      footer={
+        <button
+          type="button"
+          onClick={onClose}
+          className="bg-[#1a2f5e] text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
+        >
+          Done
+        </button>
+      }
+    >
+      <div className="flex flex-col items-center gap-4 text-center">
         <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
-          <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
         </div>
-        <h2 className="text-xl font-bold text-zinc-800">You&apos;re registered!</h2>
-        <p className="text-sm text-zinc-500">
-          You&apos;ve successfully registered for{" "}
-          <span className="font-medium text-zinc-700">{session.title}</span>.
-          {session.format === "VIRTUAL" && session.meetingUrl ? (
-            <> Join via: <span className="font-mono text-xs">{session.meetingUrl}</span></>
-          ) : null}
+        <p className="text-sm text-zinc-500 leading-relaxed">
+          Session details
+          {session.format === "VIRTUAL" ? " and the Zoom link" : ""} will appear under{" "}
+          <span className="font-medium text-zinc-700">My Registrations</span>.
         </p>
-        <button onClick={onClose} className="mt-2 bg-[#1a2f5e] text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors">Done</button>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -552,20 +546,20 @@ function RegistrationRow({
     (registration.status === "REGISTERED" || registration.status === "WAITLISTED");
 
   return (
-    <div className="flex items-center justify-between py-3 border-b border-zinc-100 last:border-0">
-      <div className="flex items-center gap-4">
-        <div className="bg-[#1a2f5e] text-white rounded text-center px-2 py-1 min-w-[44px]">
+    <div className="flex flex-col gap-3 py-3 border-b border-zinc-100 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="bg-[#1a2f5e] text-white rounded text-center px-2 py-1 min-w-[44px] shrink-0">
           <div className="text-[10px] font-medium uppercase">{month}</div>
           <div className="text-base font-bold leading-tight">{day}</div>
         </div>
-        <div>
-          <p className="text-sm font-medium text-zinc-800">{registration.session.title}</p>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-zinc-800 truncate">{registration.session.title}</p>
           <p className="text-xs text-zinc-500">
             {formatSessionTime(registration.session.startsAt, registration.session.endsAt)} · {formatLabel} · {registration.session.agency.name}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 self-start sm:self-auto pl-14 sm:pl-0">
         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${registrationStatusClass(registration.status)}`}>{status}</span>
         {canCancel && (
           <button
@@ -762,14 +756,14 @@ export default function ProviderPage() {
         <PortalNotice message={portalNotice} />
         <div>
           <h1 className="text-2xl font-bold text-[#1a2f5e]">Orientation Dashboard</h1>
-          <p className="mt-1 text-sm text-zinc-500">Register for upcoming orientation sessions required for Massachusetts early care and education providers. Browse available slots by agency, region, language, and format — <span className="font-medium text-zinc-700">you can register for any orientation across the state, not just your region.</span></p>
+          <p className="mt-1 text-sm text-zinc-500 max-w-3xl leading-relaxed">
+            Browse and register for upcoming voucher orientation sessions across
+            Massachusetts. Center-based providers and family child care
+            providers attend the same orientation session.
+          </p>
         </div>
 
-        {/* Filters */}
-        <p className="text-xs text-zinc-500 -mb-2">
-          Orientations are open statewide — leave <span className="font-medium">Region</span> set to “All Regions” to see every available session, or filter to a specific region.
-        </p>
-        <div className="border border-zinc-200 rounded-lg bg-white p-4 flex flex-wrap gap-4 items-end">
+        <div className="border border-zinc-200 rounded-xl bg-white p-4 flex flex-wrap gap-4 items-end">
           {[
             { label: "CCR&R Agency", value: agency, setter: setAgency, opts: ["All Agencies", ...agencies.map((entry) => entry.name)] },
             { label: "Region", value: region, setter: setRegion, opts: ["All Regions", ...regions] },
@@ -777,7 +771,7 @@ export default function ProviderPage() {
             { label: "Date Range", value: dateRange, setter: setDateRange, opts: DATE_RANGES },
             { label: "Format", value: format, setter: setFormat, opts: FORMATS },
           ].map(({ label, value, setter, opts, formatOption }) => (
-            <div key={label} className="flex flex-col gap-1 min-w-[160px]">
+            <div key={label} className="flex flex-col gap-1 min-w-[148px] flex-1">
               <label className="text-xs text-zinc-500 font-medium">{label}</label>
               <select value={value} onChange={(e) => setter(e.target.value)} className="border border-zinc-300 rounded-md px-3 py-2 text-sm text-zinc-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1a2f5e]">
                 {opts.map((o) => (
@@ -836,23 +830,10 @@ export default function ProviderPage() {
           )}
         </section>
 
-        {/* Attendance Note */}
-        <div id="resources" className="border border-amber-200 bg-amber-50 rounded-lg px-5 py-4">
-          <p className="text-sm font-semibold text-amber-900">Important Attendance Note</p>
-          <p className="text-sm text-amber-800 mt-0.5">Attendance is tracked for all virtual sessions. Please ensure you sign in with the same email used for registration to receive your certificate of completion.</p>
-        </div>
+        <ResourcesSection />
       </main>
 
-      <footer className="border-t border-zinc-200 bg-white py-4 px-6">
-        <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-zinc-400">
-          <span>© 2026 Massachusetts Department of Early Education and Care</span>
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-zinc-600">Accessibility</a>
-            <a href="#" className="hover:text-zinc-600">Contact Support</a>
-            <a href="#" className="hover:text-zinc-600">Privacy Policy</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
     </PersonaGuardBoundary>
   );
