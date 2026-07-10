@@ -1,24 +1,38 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth, UserButton } from "@clerk/nextjs";
 
 import { PortalNotice } from "@/components/portal-notice";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
-import { escapeCSV } from "@/lib/csv";
+import { escapeCSV, buildCsv, downloadCsv } from "@/lib/csv";
 import { getLanguageLabel } from "@/lib/languages";
 
 type Registration = {
   id: string;
   providerName: string;
+  organizationName: string;
+  stateProviderId: string | null;
+  contactEmail: string;
+  phone: string | null;
+  providerTypeLabel: string;
   agency: string;
+  agencyRegion: string;
   region: string;
+  licensingRegion: string;
+  subsidyRegion: string;
   preferredLanguage: string;
+  sessionTitle: string;
   sessionDate: string;
+  sessionEndsAt: string;
+  registeredAt: string;
   format: string;
-  status: "Attended" | "Registered" | "No-show";
+  status: "Attended" | "Registered" | "No-show" | "Waitlisted" | "Cancelled";
+  followUpSent: string;
+  reminderSent: string;
+  feedbackSurveySent: string;
+  notes: string;
 };
 
 type EecStats = {
@@ -57,6 +71,8 @@ function StatusBadge({ status }: { status: Registration["status"] }) {
     Attended: "bg-green-50 text-green-700",
     Registered: "bg-blue-50 text-blue-700",
     "No-show": "bg-red-50 text-red-600",
+    Waitlisted: "bg-yellow-50 text-yellow-700",
+    Cancelled: "bg-zinc-100 text-zinc-500",
   };
   return (
     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[status]}`}>
@@ -71,6 +87,31 @@ function formatSessionDate(iso: string) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+  });
+}
+
+function formatTimeRange(startIso: string, endIso: string) {
+  const start = new Date(startIso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+  });
+  const end = new Date(endIso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+  });
+  return `${start} – ${end} ET`;
 }
 
 function formatAuditTimestamp(iso: string) {
@@ -168,7 +209,6 @@ function RegionalCompletionPanel({ regionalRates }: { regionalRates: RegionalRat
 
 export default function EecPage() {
   const { isLoaded, userId } = useAuth();
-  const router = useRouter();
   const { isReady: portalReady, notice: portalNotice, setupMessage, portalLabel, canLoadData } = usePersonaGuard("eec");
   const [activeNav, setActiveNav] = useState("Overview");
   const [agency, setAgency] = useState("All Agencies");
@@ -259,23 +299,7 @@ export default function EecPage() {
           return;
         }
 
-        setRegistrations(
-          json.data.registrations.map(
-            (registration: {
-              id: string;
-              providerName: string;
-              agency: string;
-              region: string;
-              preferredLanguage: string;
-              sessionDate: string;
-              format: string;
-              status: Registration["status"];
-            }) => ({
-              ...registration,
-              sessionDate: formatSessionDate(registration.sessionDate),
-            }),
-          ),
-        );
+        setRegistrations(json.data.registrations);
       } catch {
         setError("Network error. Please try again.");
         setRegistrations([]);
@@ -301,6 +325,8 @@ export default function EecPage() {
     return registrations.filter(
       (registration) =>
         registration.providerName.toLowerCase().includes(query) ||
+        registration.organizationName.toLowerCase().includes(query) ||
+        (registration.stateProviderId ?? "").toLowerCase().includes(query) ||
         registration.agency.toLowerCase().includes(query) ||
         registration.region.toLowerCase().includes(query),
     );
@@ -322,24 +348,63 @@ export default function EecPage() {
   }, [activeNav]);
 
   function exportCsv() {
-    const headers = ["Provider Name", "Agency", "Region", "Language", "Session Date", "Format", "Status"];
+    const headers = [
+      "PID",
+      "Program Name",
+      "Provider Name",
+      "Provider Type",
+      "Contact Email",
+      "Phone",
+      "CCR&R Agency",
+      "Session Region",
+      "Licensing Region",
+      "Subsidy Region",
+      "Language",
+      "Session Title",
+      "Orientation Date",
+      "Orientation Time",
+      "Format",
+      "Registration Date",
+      "Registration Time",
+      "Attendance Status",
+      "Sent Follow-up Email",
+      "Sent Reminder",
+      "Sent Feedback Survey",
+      "Notes",
+    ];
+
     const rows = filteredRegistrations.map((registration) => [
+      escapeCSV(registration.stateProviderId ?? ""),
+      escapeCSV(registration.organizationName),
       escapeCSV(registration.providerName),
+      escapeCSV(registration.providerTypeLabel),
+      escapeCSV(registration.contactEmail),
+      escapeCSV(registration.phone ?? ""),
       escapeCSV(registration.agency),
       escapeCSV(registration.region),
+      escapeCSV(registration.licensingRegion),
+      escapeCSV(registration.subsidyRegion),
       escapeCSV(getLanguageLabel(registration.preferredLanguage)),
-      escapeCSV(registration.sessionDate),
+      escapeCSV(registration.sessionTitle),
+      escapeCSV(formatSessionDate(registration.sessionDate)),
+      escapeCSV(formatTimeRange(registration.sessionDate, registration.sessionEndsAt)),
       escapeCSV(registration.format),
+      escapeCSV(formatSessionDate(registration.registeredAt)),
+      escapeCSV(
+        new Date(registration.registeredAt).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: "America/New_York",
+        }) + " ET",
+      ),
       escapeCSV(registration.status),
+      escapeCSV(registration.followUpSent),
+      escapeCSV(registration.reminderSent),
+      escapeCSV(registration.feedbackSurveySent),
+      escapeCSV(registration.notes),
     ]);
-    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "eec-registrations.csv";
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 100);
+
+    downloadCsv("eec-registrations.csv", buildCsv(headers, rows));
   }
 
   if (!isLoaded || !userId) return null;
@@ -478,7 +543,15 @@ export default function EecPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-100 bg-zinc-50">
-                      {["Provider Name", "Agency", "Region", "Language", "Session Date", "Format", "Status"].map((header) => (
+                      {[
+                        "Provider Name",
+                        "Program",
+                        "PID",
+                        "Agency",
+                        "Orientation",
+                        "Registered",
+                        "Status",
+                      ].map((header) => (
                         <th key={header} className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">
                           {header}
                         </th>
@@ -502,13 +575,20 @@ export default function EecPage() {
                       filteredRegistrations.map((registration) => (
                         <tr key={registration.id} className="border-b border-zinc-50 hover:bg-zinc-50 transition-colors">
                           <td className="px-4 py-3 font-medium text-zinc-800">{registration.providerName}</td>
-                          <td className="px-4 py-3 text-zinc-600">{registration.agency}</td>
-                          <td className="px-4 py-3 text-zinc-600">{registration.region}</td>
-                          <td className="px-4 py-3 text-zinc-600">
-                            {getLanguageLabel(registration.preferredLanguage)}
+                          <td className="px-4 py-3 text-zinc-600">{registration.organizationName}</td>
+                          <td className="px-4 py-3 text-zinc-500 font-mono text-xs">
+                            {registration.stateProviderId ?? "—"}
                           </td>
-                          <td className="px-4 py-3 text-zinc-600">{registration.sessionDate}</td>
-                          <td className="px-4 py-3 text-zinc-600">{registration.format}</td>
+                          <td className="px-4 py-3 text-zinc-600">{registration.agency}</td>
+                          <td className="px-4 py-3 text-zinc-600">
+                            <p>{formatSessionDate(registration.sessionDate)}</p>
+                            <p className="text-xs text-zinc-400">
+                              {formatTimeRange(registration.sessionDate, registration.sessionEndsAt)}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-600">
+                            {formatDateTime(registration.registeredAt)}
+                          </td>
                           <td className="px-4 py-3">
                             <StatusBadge status={registration.status} />
                           </td>
@@ -680,7 +760,7 @@ export default function EecPage() {
       </div>
       <footer className="border-t border-zinc-200 bg-white py-3 px-6">
         <div className="flex items-center justify-between text-xs text-zinc-400">
-          <span>© 2024 Massachusetts Department of Early Education and Care</span>
+          <span>© 2026 Massachusetts Department of Early Education and Care</span>
           <div className="flex gap-4">
             <a href="#" className="hover:text-zinc-600">Privacy Policy</a>
             <a href="#" className="hover:text-zinc-600">Terms of Service</a>

@@ -1,5 +1,4 @@
 import { ProviderType } from "@prisma/client";
-
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { requireRole } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db";
@@ -43,7 +42,7 @@ function getRegistrationDateBounds(dateRange: string | null, now: Date) {
 function formatStatus(
   status: string,
   attendanceStatus: string,
-): "Attended" | "Registered" | "No-show" {
+): "Attended" | "Registered" | "No-show" | "Waitlisted" | "Cancelled" {
   if (status === "ATTENDED" || attendanceStatus === "ATTENDED") {
     return "Attended";
   }
@@ -52,7 +51,34 @@ function formatStatus(
     return "No-show";
   }
 
+  if (status === "WAITLISTED") {
+    return "Waitlisted";
+  }
+
+  if (status === "CANCELLED") {
+    return "Cancelled";
+  }
+
   return "Registered";
+}
+
+function formatProviderType(providerType: string | null) {
+  switch (providerType) {
+    case "CENTER_BASED":
+      return "Center-based";
+    case "FAMILY_CHILD_CARE":
+      return "Family Child Care";
+    case "SCHOOL_AGE":
+      return "School-age";
+    case "OTHER":
+      return "Other";
+    default:
+      return "";
+  }
+}
+
+function formatYesNo(value: Date | null | undefined) {
+  return value ? "Y" : "N";
 }
 
 export async function GET(request: Request) {
@@ -100,30 +126,74 @@ export async function GET(request: Request) {
             region: true,
             format: true,
             startsAt: true,
+            endsAt: true,
             agency: { select: { id: true, name: true, region: true } },
           },
         },
       },
     });
 
+    const providerIds = [
+      ...new Set(
+        registrations
+          .map((registration) => registration.stateProviderId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    const providerPrograms =
+      providerIds.length > 0
+        ? await prisma.providerProgram.findMany({
+            where: { stateProviderId: { in: providerIds } },
+            select: {
+              stateProviderId: true,
+              licensingRegion: true,
+              subsidyRegion: true,
+            },
+          })
+        : [];
+
+    const programByProviderId = new Map(
+      providerPrograms.map((program) => [program.stateProviderId, program]),
+    );
+
     return jsonSuccess({
-      registrations: registrations.map((registration) => ({
-        id: registration.id,
-        providerName: registration.providerName,
-        organizationName: registration.organizationName,
-        contactEmail: registration.contactEmail,
-        agency: registration.session.agency.name,
-        region: registration.session.region,
-        preferredLanguage: registration.preferredLanguage,
-        sessionTitle: registration.session.title,
-        sessionDate: registration.session.startsAt.toISOString(),
-        format:
-          registration.session.format === "VIRTUAL" ? "Virtual" : "In-person",
-        status: formatStatus(
-          registration.status,
-          registration.attendanceStatus,
-        ),
-      })),
+      registrations: registrations.map((registration) => {
+        const program = registration.stateProviderId
+          ? programByProviderId.get(registration.stateProviderId)
+          : undefined;
+
+        return {
+          id: registration.id,
+          providerName: registration.providerName,
+          organizationName: registration.organizationName,
+          stateProviderId: registration.stateProviderId,
+          contactEmail: registration.contactEmail,
+          phone: registration.phone,
+          providerType: registration.providerType,
+          providerTypeLabel: formatProviderType(registration.providerType),
+          agency: registration.session.agency.name,
+          agencyRegion: registration.session.agency.region,
+          region: registration.session.region,
+          licensingRegion: program?.licensingRegion ?? "",
+          subsidyRegion: program?.subsidyRegion ?? "",
+          preferredLanguage: registration.preferredLanguage,
+          sessionTitle: registration.session.title,
+          sessionDate: registration.session.startsAt.toISOString(),
+          sessionEndsAt: registration.session.endsAt.toISOString(),
+          registeredAt: registration.createdAt.toISOString(),
+          format:
+            registration.session.format === "VIRTUAL" ? "Virtual" : "In-person",
+          status: formatStatus(
+            registration.status,
+            registration.attendanceStatus,
+          ),
+          followUpSent: formatYesNo(registration.followUpSentAt),
+          reminderSent: formatYesNo(registration.reminderSentAt),
+          feedbackSurveySent: "N",
+          notes: registration.notes ?? "",
+        };
+      }),
       total: registrations.length,
     });
   } catch (error) {

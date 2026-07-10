@@ -7,8 +7,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/health",
   "/api/sessions",
   "/api/sessions/filter-options",
-  "/api/cron/daily-digest",
-  "/api/cron/sync-providers",
+  "/api/cron(.*)",
 ]);
 
 export default clerkMiddleware((auth, request) => {
