@@ -63,7 +63,7 @@ type AuditLog = {
   agency: string;
 };
 
-const NAV_ITEMS = ["Overview", "Registration Data", "Regional Analytics", "Agency Compliance", "Audit Logs"];
+const NAV_ITEMS = ["Overview", "Registration Data", "Agency Compliance", "Audit Logs"];
 const DATE_RANGES = ["Last 30 Days", "Last 7 Days", "Last 90 Days", "All Time"];
 const PROVIDER_TYPES = ["All Types", "Center-based", "Family-based", "School-age"];
 
@@ -339,8 +339,6 @@ export default function EecPage() {
     switch (activeNav) {
       case "Registration Data":
         return "Registration Data";
-      case "Regional Analytics":
-        return "Regional Analytics";
       case "Agency Compliance":
         return "Agency Compliance";
       case "Audit Logs":
@@ -622,55 +620,6 @@ export default function EecPage() {
                       ? " (filtered)"
                       : ""}
                   </p>
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeNav === "Regional Analytics" && (
-            <>
-              <StatsCards stats={stats} />
-              <div className="grid grid-cols-2 gap-4">
-                <TrendChart trend={trend} maxTrend={maxTrend} />
-                <RegionalCompletionPanel regionalRates={regionalRates} />
-              </div>
-              <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
-                <div className="px-4 py-3 border-b border-zinc-100">
-                  <p className="text-sm font-semibold text-zinc-800">Completion by Region</p>
-                </div>
-                <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-100 bg-zinc-50">
-                      {["Region", "Completion Rate", "Progress"].map((header) => (
-                        <th key={header} className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {regionalRates.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-sm text-zinc-400">
-                          No regional data available.
-                        </td>
-                      </tr>
-                    ) : (
-                      regionalRates.map((rate) => (
-                        <tr key={rate.region} className="border-b border-zinc-50">
-                          <td className="px-4 py-3 font-medium text-zinc-800">{rate.region}</td>
-                          <td className="px-4 py-3 text-zinc-600">{rate.rate}%</td>
-                          <td className="px-4 py-3">
-                            <div className="h-2 bg-zinc-100 rounded-full max-w-xs">
-                              <div className="h-full bg-[#1a2f5e] rounded-full" style={{ width: `${rate.rate}%` }} />
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
                 </div>
               </div>
             </>

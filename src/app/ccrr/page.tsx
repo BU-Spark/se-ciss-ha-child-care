@@ -320,15 +320,6 @@ export default function CcrrPage() {
           />
         )}
 
-        <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-4">
-          <p className="text-sm font-semibold text-[#1a2f5e]">Reporting tip</p>
-          <p className="text-sm text-zinc-600 mt-0.5 leading-relaxed">
-            Use Export All Data above to download your agency&apos;s session
-            attendance for compliance reporting. Verify virtual attendance logs
-            before submitting to EEC.
-          </p>
-        </div>
-
         <ResourcesSection />
       </main>
       <SiteFooter />
