@@ -137,7 +137,7 @@ export function CreateSessionModal({
 
   return (
     <ModalShell
-      title="Add orientation session"
+      title="Add information session"
       description="Times are in Eastern Time. Published sessions appear on the provider portal immediately."
       onClose={onClose}
       footer={

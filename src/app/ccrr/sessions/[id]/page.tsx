@@ -297,21 +297,21 @@ export default function SessionDetailPage() {
     >
   {loading ? (
       <div className="min-h-screen bg-zinc-50 flex flex-col">
-        <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
+        <PersonaNav basePath="/ccrr" subtitle="CCRR Staff" />
         <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
           <p className="text-sm text-zinc-400 py-12 text-center">Loading session...</p>
         </main>
       </div>
   ) : !session ? (
       <div className="min-h-screen bg-zinc-50 flex flex-col">
-        <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
+        <PersonaNav basePath="/ccrr" subtitle="CCRR Staff" />
         <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
           <p className="text-sm text-red-600 py-12 text-center">{error ?? "Session not found."}</p>
         </main>
       </div>
   ) : (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
-      <PersonaNav basePath="/ccrr" subtitle="CCR&R Staff" />
+      <PersonaNav basePath="/ccrr" subtitle="CCRR Staff" />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-6">
         <PortalNotice message={portalNotice} />
 
@@ -327,7 +327,7 @@ export default function SessionDetailPage() {
             <p className="text-sm text-zinc-500 mt-1">
               {canManageAttendance
                 ? "Manage attendance and session records for active early care and education providers."
-                : "View-only: this session is hosted by another CCR&R agency."}
+                : "View-only: this session is hosted by another CCRR agency."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

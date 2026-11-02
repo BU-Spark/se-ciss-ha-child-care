@@ -641,7 +641,7 @@ export default function ProviderPage() {
           setRegistrations([]);
           setRegistrationsError(
             res.status === 403
-              ? "Staff accounts cannot view provider registrations. Use a provider account, or open the CCR&R dashboard."
+              ? "Staff accounts cannot view provider registrations. Use a provider account, or open the CCRR dashboard."
               : json.error?.message ?? "Unable to load your registrations.",
           );
         }
@@ -755,17 +755,17 @@ export default function ProviderPage() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
         <PortalNotice message={portalNotice} />
         <div>
-          <h1 className="text-2xl font-bold text-[#1a2f5e]">Orientation Dashboard</h1>
+          <h1 className="text-2xl font-bold text-[#1a2f5e]">Information Session Dashboard</h1>
           <p className="mt-1 text-sm text-zinc-500 max-w-3xl leading-relaxed">
-            Browse and register for upcoming voucher orientation sessions across
+            Browse and register for upcoming voucher information sessions across
             Massachusetts. Center-based providers and family child care
-            providers attend the same orientation session.
+            providers attend the same information session.
           </p>
         </div>
 
         <div className="border border-zinc-200 rounded-xl bg-white p-4 flex flex-wrap gap-4 items-end">
           {[
-            { label: "CCR&R Agency", value: agency, setter: setAgency, opts: ["All Agencies", ...agencies.map((entry) => entry.name)] },
+            { label: "CCRR Agency", value: agency, setter: setAgency, opts: ["All Agencies", ...agencies.map((entry) => entry.name)] },
             { label: "Region", value: region, setter: setRegion, opts: ["All Regions", ...regions] },
             { label: "Session Language", value: language, setter: setLanguage, opts: ["All Languages", ...sessionLanguages], formatOption: (option: string) => option === "All Languages" ? option : getLanguageLabel(option) },
             { label: "Date Range", value: dateRange, setter: setDateRange, opts: DATE_RANGES },
@@ -785,7 +785,7 @@ export default function ProviderPage() {
         {/* Sessions Grid */}
         <section id="sessions">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-zinc-800">Available Orientations</h2>
+            <h2 className="font-semibold text-zinc-800">Available Information Sessions</h2>
             <span className="text-sm text-zinc-500">{loading ? "Loading..." : `Showing ${sessions.length} results`}</span>
           </div>
           {loading ? (

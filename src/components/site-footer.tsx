@@ -13,7 +13,7 @@ export function SiteFooter({ className = "" }: SiteFooterProps) {
           Education and Care
         </span>
         <p className="sm:text-right">
-          For support, contact your regional CCR&amp;R agency listed under
+          For support, contact your regional CCRR agency listed under
           Resources.
         </p>
       </div>

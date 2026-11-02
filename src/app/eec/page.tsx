@@ -147,7 +147,7 @@ function StatsCards({ stats }: { stats: EecStats | null }) {
           sub: stats ? `Across ${stats.regionCount} Regions` : "—",
         },
         {
-          label: "CCR&R AGENCIES",
+          label: "CCRR AGENCIES",
           value: stats?.agenciesCount.toLocaleString() ?? "—",
           sub: "Active Network",
         },
@@ -344,7 +344,7 @@ export default function EecPage() {
       case "Audit Logs":
         return "Audit Logs";
       default:
-        return "EEC Orientation – Administrator";
+        return "EEC Information Sessions – Administrator";
     }
   }, [activeNav]);
 
@@ -356,14 +356,14 @@ export default function EecPage() {
       "Provider Type",
       "Contact Email",
       "Phone",
-      "CCR&R Agency",
+      "CCRR Agency",
       "Session Region",
       "Licensing Region",
       "Subsidy Region",
       "Language",
       "Session Title",
-      "Orientation Date",
-      "Orientation Time",
+      "Information Session Date",
+      "Information Session Time",
       "Format",
       "Registration Date",
       "Registration Time",
@@ -562,7 +562,7 @@ export default function EecPage() {
                         "Program",
                         "PID",
                         "Agency",
-                        "Orientation",
+                        "Information Session",
                         "Registered",
                         "Status",
                       ].map((header) => (
@@ -632,7 +632,7 @@ export default function EecPage() {
               </div>
               <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-zinc-100">
-                  <p className="text-sm font-semibold text-zinc-800">CCR&amp;R Agency Summary</p>
+                  <p className="text-sm font-semibold text-zinc-800">CCRR Agency Summary</p>
                 </div>
                 <div className="overflow-x-auto">
                 <table className="w-full text-sm">

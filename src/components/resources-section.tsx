@@ -14,7 +14,7 @@ export function ResourcesSection({ notice }: ResourcesSectionProps) {
       <div>
         <h2 className="text-lg font-semibold text-[#1a2f5e]">Resources</h2>
         <p className="mt-1 text-sm text-zinc-500 max-w-2xl leading-relaxed">
-          Official Massachusetts CCR&amp;R agencies that host EEC orientation.
+          Official Massachusetts CCRR agencies that host EEC information sessions.
           Contact your regional agency for paperwork and local support.
         </p>
         {notice ? (
@@ -25,7 +25,7 @@ export function ResourcesSection({ notice }: ResourcesSectionProps) {
       <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-zinc-700 leading-relaxed">
         <p className="font-medium text-[#1a2f5e]">Paperwork</p>
         <p className="mt-1">
-          EEC is collecting required paperwork from each CCR&amp;R. Packets for{" "}
+          EEC is collecting required paperwork from each CCRR. Packets for{" "}
           <span className="font-medium">Child Care Choices of Boston</span> and{" "}
           <span className="font-medium">Seven Hills Child Care Resources</span>{" "}
           will be downloadable here as soon as they are published. Until then,

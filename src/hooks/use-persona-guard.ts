@@ -18,7 +18,7 @@ type MeProfile = {
 
 const portalLabels: Record<PortalId, string> = {
   provider: "Child Care Provider",
-  ccrr: "CCR&R Staff",
+  ccrr: "CCRR Staff",
   eec: "EEC Administrator",
 };
 

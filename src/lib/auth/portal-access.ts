@@ -36,7 +36,7 @@ export function wrongPortalMessage(profile: ProfileShape, portal: PortalId) {
 
   const labels: Record<PortalId, string> = {
     provider: "Child Care Provider",
-    ccrr: "CCR&R Staff",
+    ccrr: "CCRR Staff",
     eec: "EEC Administrator",
   };
 

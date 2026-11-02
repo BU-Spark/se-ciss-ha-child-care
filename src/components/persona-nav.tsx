@@ -26,7 +26,7 @@ export function PersonaNav({ basePath, subtitle }: PersonaNavProps) {
               M
             </div>
             <span className="font-semibold text-[#1a2f5e] text-sm">
-              EEC Orientation
+              EEC Information Sessions
             </span>
           </Link>
           <div className="flex items-center gap-3">

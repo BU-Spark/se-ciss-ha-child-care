@@ -13,7 +13,7 @@ export default function Home() {
               M
             </div>
             <span className="font-semibold text-[#1a2f5e] text-sm">
-              EEC Orientation
+              EEC Information Sessions
             </span>
           </div>
           <HomeAuth />
@@ -26,11 +26,11 @@ export default function Home() {
             Commonwealth of Massachusetts
           </p>
           <h1 className="text-3xl font-bold sm:text-4xl tracking-tight">
-            EEC Orientation Management
+            EEC Information Session Management
           </h1>
           <p className="mt-4 text-base text-blue-100 max-w-2xl leading-relaxed">
             Unified system for early care and education providers to register
-            for orientation sessions and for CCR&amp;R agencies and EEC to track
+            for information sessions and for CCRR agencies and EEC to track
             participation statewide.
           </p>
         </div>
@@ -45,7 +45,7 @@ export default function Home() {
               your work email, then open the Provider portal to browse sessions.
             </li>
             <li>
-              <strong>CCR&amp;R staff</strong> and{" "}
+              <strong>CCRR staff</strong> and{" "}
               <strong>EEC administrators</strong> sign in with accounts
               provisioned by your team administrator.
             </li>

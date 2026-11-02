@@ -238,14 +238,14 @@ export default function CcrrPage() {
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       <PersonaNav
         basePath="/ccrr"
-        subtitle="Welcome, CCR&R Staff"
+        subtitle="Welcome, CCRR Staff"
       />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
         <PortalNotice message={portalNotice} />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2f5e]">Staff Dashboard</h1>
-            <p className="mt-1 text-sm text-zinc-500 max-w-lg">Manage upcoming orientation sessions, track registration progress, and export agency attendance data for federal compliance.</p>
+            <p className="mt-1 text-sm text-zinc-500 max-w-lg">Manage upcoming information sessions, track registration progress, and export agency attendance data for federal compliance.</p>
             {exportError && (
               <p className="mt-2 text-sm text-red-600">{exportError}</p>
             )}
@@ -286,7 +286,7 @@ export default function CcrrPage() {
               {errorCode === "PROFILE_NOT_LINKED" && (
                 <>
                   <p className="mt-2 text-red-700">
-                    Sign in with your CCR&amp;R staff email, or run:
+                    Sign in with your CCRR staff email, or run:
                   </p>
                   <code className="mt-1 block rounded bg-red-100 px-2 py-1 text-xs text-red-900">
                     npm run account:link -- ccrr YOUR_CLERK_USER_ID agency-child-care-choices staff@example.com

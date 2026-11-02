@@ -25,7 +25,7 @@ export function AccountSetupRequired({
             <p className="font-medium text-zinc-900">What to do</p>
             <p className="mt-2">
               Sign out and sign in with the email that matches this portal role,
-              then refresh. Provider and CCR&amp;R staff use different emails.
+              then refresh. Provider and CCRR staff use different emails.
             </p>
           </div>
 
