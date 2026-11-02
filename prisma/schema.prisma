@@ -60,6 +60,7 @@ model Agency {
   appUsers AppUser[] @relation("AppUserAgency")
   staff    StaffUser[]
   sessions OrientationSession[]
+  registrationsAssisted Registration[] @relation("RegistrationAgency")
 
   @@unique([name, region])
   @@map("CcrrAgency")
@@ -164,6 +165,8 @@ model Registration {
   id        String             @id @default(cuid())
   sessionId String
   session   OrientationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  registrationAgencyId String?
+  registrationAgency Agency? @relation("RegistrationAgency", fields: [registrationAgencyId], references: [id], onDelete: SetNull)
   userId    String?
   user      AppUser?           @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -187,6 +190,7 @@ model Registration {
 
   @@index([userId])
   @@index([sessionId])
+  @@index([registrationAgencyId])
   @@index([status])
   @@index([attendanceStatus])
   @@index([preferredLanguage])

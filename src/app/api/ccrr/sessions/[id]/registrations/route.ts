@@ -1,3 +1,6 @@
+import { RegistrationStatus } from "@prisma/client";
+import { z } from "zod";
+
 import { ApiError } from "@/lib/api/errors";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import {
@@ -6,6 +9,14 @@ import {
 } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db";
 import { rosterRegistrationStatusFilter } from "@/lib/registration-status";
+
+const staffRegistrationSchema = z.object({
+  providerName: z.string().trim().min(1),
+  contactEmail: z.string().trim().email(),
+  phone: z.string().trim().optional(),
+  stateProviderId: z.string().trim().min(1),
+  preferredLanguage: z.string().trim().min(2).max(10).optional(),
+});
 
 export async function GET(
   _request: Request,
@@ -34,6 +45,7 @@ export async function GET(
             notes: true,
             createdAt: true,
             checkedInAt: true,
+            registrationAgency: { select: { id: true, name: true } },
           },
         },
       },
@@ -52,8 +64,12 @@ export async function GET(
       );
     }
 
+    const canManageAttendance =
+      profile.role === "EEC_ADMIN" || session.agencyId === profile.agencyId;
+
     return jsonSuccess({
-      canManageAttendance: true,
+      canManageAttendance,
+      canAssistRegistration: profile.role === "CCRR_STAFF" && session.status === "PUBLISHED",
       session: {
         id: session.id,
         title: session.title,
@@ -82,8 +98,83 @@ export async function GET(
         notes: r.notes,
         registeredAt: r.createdAt.toISOString(),
         checkedInAt: r.checkedInAt?.toISOString() ?? null,
+        registrationAgency: r.registrationAgency,
       })),
     });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const profile = await requireRole(["CCRR_STAFF"]);
+    const registrationAgencyId = requireCcrrAgencyId(profile);
+    const { id: sessionId } = await context.params;
+    const body = staffRegistrationSchema.safeParse(await request.json());
+
+    if (!body.success) {
+      throw ApiError.badRequest("Enter a valid provider registration", "INVALID_BODY");
+    }
+
+    const registration = await prisma.$transaction(async (tx) => {
+      const [session, program] = await Promise.all([
+        tx.orientationSession.findUnique({ where: { id: sessionId } }),
+        tx.providerProgram.findUnique({ where: { stateProviderId: body.data.stateProviderId } }),
+      ]);
+
+      if (!session || session.status !== "PUBLISHED") throw ApiError.notFound("Session not found");
+      if (session.startsAt <= new Date()) {
+        throw ApiError.badRequest("Registration is closed for this session", "REGISTRATION_CLOSED");
+      }
+      if (!program || !program.isActive) {
+        throw ApiError.badRequest("Program ID was not found in the active provider directory", "INVALID_PROGRAM_ID");
+      }
+
+      const existing = await tx.registration.findFirst({
+        where: { sessionId, stateProviderId: program.stateProviderId, status: { not: RegistrationStatus.CANCELLED } },
+      });
+      if (existing) throw ApiError.conflict("This Program ID is already registered for this session", "DUPLICATE_REGISTRATION");
+
+      const count = await tx.registration.count({ where: { sessionId, ...rosterRegistrationStatusFilter } });
+      if ((session.capacity ?? 0) > 0 && count >= (session.capacity ?? 0)) {
+        throw ApiError.conflict("This session is full", "SESSION_FULL");
+      }
+
+      return tx.registration.create({
+        data: {
+          sessionId,
+          registrationAgencyId,
+          providerName: body.data.providerName,
+          organizationName: program.programName,
+          contactEmail: body.data.contactEmail,
+          phone: body.data.phone || null,
+          providerType: program.providerType,
+          stateProviderId: program.stateProviderId,
+          preferredLanguage: body.data.preferredLanguage ?? "en",
+          status: RegistrationStatus.REGISTERED,
+          attendanceStatus: "NOT_MARKED",
+        },
+        include: { registrationAgency: { select: { id: true, name: true } } },
+      });
+    });
+
+    return jsonSuccess({
+      registration: {
+        id: registration.id,
+        providerName: registration.providerName,
+        organizationName: registration.organizationName,
+        stateProviderId: registration.stateProviderId,
+        contactEmail: registration.contactEmail,
+        attendanceStatus: registration.attendanceStatus,
+        notes: registration.notes,
+        registeredAt: registration.createdAt.toISOString(),
+        registrationAgency: registration.registrationAgency,
+      },
+    }, 201);
   } catch (error) {
     return handleApiError(error);
   }

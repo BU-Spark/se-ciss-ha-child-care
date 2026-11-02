@@ -8,6 +8,7 @@ import { PersonaNav } from "@/components/persona-nav";
 import { PortalNotice } from "@/components/portal-notice";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { SiteFooter } from "@/components/site-footer";
+import { ModalShell } from "@/components/modal-shell";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
 import { formatAppDate, formatAppTimeRange } from "@/lib/datetime";
 
@@ -19,6 +20,7 @@ type Provider = {
   registrationDate: string;
   attendanceStatus: "NOT_MARKED" | "ATTENDED" | "NO_SHOW";
   notes: string;
+  registrationAgency: { id: string; name: string } | null;
 };
 
 type SessionDetail = {
@@ -40,6 +42,7 @@ type ApiRegistration = {
   attendanceStatus: "NOT_MARKED" | "ATTENDED" | "NO_SHOW";
   notes: string | null;
   registeredAt: string;
+  registrationAgency: { id: string; name: string } | null;
 };
 
 type ApiSession = {
@@ -109,6 +112,7 @@ function mapRegistration(registration: ApiRegistration): Provider {
     registrationDate: formatRegistrationDate(registration.registeredAt),
     attendanceStatus: registration.attendanceStatus,
     notes: registration.notes ?? "",
+    registrationAgency: registration.registrationAgency,
   };
 }
 
@@ -128,8 +132,13 @@ export default function SessionDetailPage() {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [canManageAttendance, setCanManageAttendance] = useState(false);
+  const [canAssistRegistration, setCanAssistRegistration] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [showStaffRegistration, setShowStaffRegistration] = useState(false);
+  const [staffForm, setStaffForm] = useState({ providerName: "", contactEmail: "", phone: "", stateProviderId: "" });
+  const [staffRegistrationError, setStaffRegistrationError] = useState<string | null>(null);
+  const [staffRegistrationSaving, setStaffRegistrationSaving] = useState(false);
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -164,6 +173,7 @@ export default function SessionDetailPage() {
           mapRegistration,
         );
         setCanManageAttendance(json.data.canManageAttendance === true);
+        setCanAssistRegistration(json.data.canAssistRegistration === true);
         setSession(mapSession(json.data.session as ApiSession));
         setProviders(mappedProviders);
         setInitialProviders(mappedProviders);
@@ -283,6 +293,38 @@ export default function SessionDetailPage() {
     }
   }
 
+  async function handleStaffRegistration() {
+    setStaffRegistrationSaving(true);
+    setStaffRegistrationError(null);
+    try {
+      const res = await fetch(`/api/ccrr/sessions/${sessionId}/registrations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerName: staffForm.providerName.trim(),
+          contactEmail: staffForm.contactEmail.trim(),
+          phone: staffForm.phone.trim() || undefined,
+          stateProviderId: staffForm.stateProviderId.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setStaffRegistrationError(json.error?.message ?? "Unable to register provider.");
+        return;
+      }
+      const added = mapRegistration(json.data.registration as ApiRegistration);
+      setProviders((current) => [...current, added]);
+      setInitialProviders((current) => [...current, added]);
+      setSession((current) => current ? { ...current, totalRegistered: current.totalRegistered + 1 } : current);
+      setStaffForm({ providerName: "", contactEmail: "", phone: "", stateProviderId: "" });
+      setShowStaffRegistration(false);
+    } catch {
+      setStaffRegistrationError("Network error. Please try again.");
+    } finally {
+      setStaffRegistrationSaving(false);
+    }
+  }
+
   if (!isLoaded || !userId) return null;
 
   const canEditAttendance =
@@ -377,7 +419,7 @@ export default function SessionDetailPage() {
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
-                {["Provider Name", "Email", "PID", "Registration Date", "Attendance", "Notes"].map((h) => (
+                {["Provider Name", "Email", "PID", "Registered by", "Registration Date", "Attendance", "Notes"].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -385,7 +427,7 @@ export default function SessionDetailPage() {
             <tbody>
               {providers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-zinc-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-zinc-400">
                     No registrations for this session yet.
                   </td>
                 </tr>
@@ -395,6 +437,7 @@ export default function SessionDetailPage() {
                     <td className="px-4 py-3 font-medium text-zinc-800">{provider.name}</td>
                     <td className="px-4 py-3 text-zinc-500">{provider.email}</td>
                     <td className="px-4 py-3 text-zinc-500 font-mono text-xs">{provider.stateProviderId ?? "—"}</td>
+                    <td className="px-4 py-3 text-xs text-zinc-500">{provider.registrationAgency?.name ?? "Provider online"}</td>
                     <td className="px-4 py-3 text-zinc-500">{provider.registrationDate}</td>
                     <td className="px-4 py-3">
                       {canEditAttendance ? (
@@ -457,17 +500,22 @@ export default function SessionDetailPage() {
               <span className="text-sm text-red-600">{saveError}</span>
             )}
           </div>
-          {canEditAttendance && (
+          {(canEditAttendance || canAssistRegistration) && (
             <div className="flex items-center gap-3">
-              <button
+              {canAssistRegistration && (
+                <button type="button" onClick={() => { setStaffRegistrationError(null); setShowStaffRegistration(true); }} className="border border-[#1a2f5e] text-[#1a2f5e] px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-50 transition-colors">
+                  + Staff-assisted registration
+                </button>
+              )}
+              {canEditAttendance && <button
                 type="button"
                 onClick={handleCancelSession}
                 disabled={cancelling}
                 className="border border-red-200 text-red-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
               >
                 {cancelling ? "Cancelling..." : "Cancel session"}
-              </button>
-              <button
+              </button>}
+              {canEditAttendance && <button
                 type="button"
                 onClick={handleMarkAttendance}
                 disabled={saving || providers.length === 0}
@@ -475,12 +523,28 @@ export default function SessionDetailPage() {
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                 {saving ? "Saving..." : "Mark Attendance"}
-              </button>
+              </button>}
             </div>
           )}
         </div>
 
       </main>
+
+      {showStaffRegistration && (
+        <ModalShell
+          title="Staff-assisted registration"
+          description="The Program ID is verified against the active provider directory. Your CCRR is recorded separately from the session host."
+          onClose={() => !staffRegistrationSaving && setShowStaffRegistration(false)}
+          footer={<><button type="button" onClick={() => setShowStaffRegistration(false)} disabled={staffRegistrationSaving} className="px-4 py-2 text-sm font-medium text-zinc-600">Cancel</button><button type="button" onClick={handleStaffRegistration} disabled={staffRegistrationSaving} className="rounded-md bg-[#1a2f5e] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{staffRegistrationSaving ? "Registering..." : "Register provider"}</button></>}
+        >
+          <div className="flex flex-col gap-4">
+            {([ ["providerName", "Provider name", "text"], ["contactEmail", "Email", "email"], ["phone", "Phone (optional)", "tel"], ["stateProviderId", "Program ID", "text"] ] as const).map(([field, label, type]) => (
+              <label key={field} className="flex flex-col gap-1 text-xs font-medium text-zinc-600">{label}<input type={type} value={staffForm[field]} onChange={(event) => setStaffForm((current) => ({ ...current, [field]: event.target.value }))} className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-800" /></label>
+            ))}
+            {staffRegistrationError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{staffRegistrationError}</p>}
+          </div>
+        </ModalShell>
+      )}
 
       <SiteFooter />
     </div>
