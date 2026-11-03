@@ -25,6 +25,8 @@ type StaffSession = {
   registered: number;
   capacity: number;
   spotsLeft: number | null;
+  agencyName: string;
+  canManage: boolean;
 };
 
 type ApiSession = {
@@ -36,6 +38,8 @@ type ApiSession = {
   registeredCount: number;
   capacity: number;
   spotsLeft: number | null;
+  agency: { id: string; name: string; region: string };
+  canManage: boolean;
 };
 
 function formatSessionDate(startsAt: string) {
@@ -56,6 +60,8 @@ function mapSession(session: ApiSession): StaffSession {
     registered: session.registeredCount,
     capacity: session.capacity,
     spotsLeft: session.spotsLeft,
+    agencyName: session.agency.name,
+    canManage: session.canManage,
   };
 }
 
@@ -78,6 +84,7 @@ function SessionCard({
       </div>
       <div>
         <p className="text-sm font-medium text-zinc-600">{session.title}</p>
+        {!session.canManage && <p className="mt-0.5 text-xs text-zinc-500">Hosted by {session.agencyName}</p>}
         <p className="text-lg font-bold text-[#1a2f5e] mt-1">{session.date}</p>
         <p className="text-sm text-zinc-500 mt-0.5">{session.time}</p>
       </div>
@@ -99,16 +106,16 @@ function SessionCard({
           onClick={() => router.push(`/ccrr/sessions/${session.id}`)}
           className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
         >
-          Manage Attendance →
+          {session.canManage ? "Manage Attendance →" : "View Attendance →"}
         </button>
-        <button
+        {session.canManage && <button
           type="button"
           onClick={() => onCancel(session.id)}
           disabled={cancelling}
           className="w-full border border-red-200 text-red-700 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
         >
           {cancelling ? "Cancelling..." : "Cancel session"}
-        </button>
+        </button>}
       </div>
     </div>
   );
@@ -298,17 +305,32 @@ export default function CcrrPage() {
           {loading ? (
             <div className="text-sm text-zinc-400 py-12 text-center">Loading sessions...</div>
           ) : sessions.length === 0 ? (
-            <div className="text-sm text-zinc-400 py-12 text-center">No upcoming sessions found for your agency.</div>
+            <div className="text-sm text-zinc-400 py-12 text-center">No upcoming statewide sessions.</div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sessions.map((session) => (
+            <div className="flex flex-col gap-7">
+              <div>
+                <h3 className="mb-3 text-sm font-medium text-zinc-600">Your Sessions</h3>
+                {sessions.filter((session) => session.canManage).length === 0 ? (
+                  <p className="py-3 text-sm text-zinc-400">No upcoming sessions hosted by your agency.</p>
+                ) : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {sessions.filter((session) => session.canManage).map((session) => (
                 <SessionCard
                   key={session.id}
                   session={session}
                   onCancel={handleCancelSession}
                   cancelling={cancellingId === session.id}
                 />
-              ))}
+                ))}</div>}
+              </div>
+              <div>
+                <h3 className="mb-3 text-sm font-medium text-zinc-600">Statewide CCRR Sessions</h3>
+                {sessions.filter((session) => !session.canManage).length === 0 ? (
+                  <p className="py-3 text-sm text-zinc-400">No sessions from other CCRRs are scheduled.</p>
+                ) : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {sessions.filter((session) => !session.canManage).map((session) => (
+                  <SessionCard key={session.id} session={session} onCancel={handleCancelSession} cancelling={false} />
+                ))}</div>}
+              </div>
             </div>
           )}
         </section>

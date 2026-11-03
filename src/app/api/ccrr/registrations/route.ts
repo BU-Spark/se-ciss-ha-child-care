@@ -42,7 +42,6 @@ export async function GET(request: Request) {
     const registrations = await prisma.registration.findMany({
       where: {
         ...rosterRegistrationStatusFilter,
-        session: { agencyId: staffAgencyId },
         ...(search
           ? {
               OR: [
@@ -101,7 +100,7 @@ export async function GET(request: Request) {
     });
 
     const agencies = await prisma.agency.findMany({
-      where: { id: staffAgencyId, isActive: true },
+      where: { isActive: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true, region: true },
     });

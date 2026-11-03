@@ -366,11 +366,11 @@ export default function SessionDetailPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2f5e]">{session.title}</h1>
-            <p className="text-sm text-zinc-500 mt-1">
-              {canManageAttendance
-                ? "Manage attendance and session records for active early care and education providers."
-                : "View-only: this session is hosted by another CCRR agency."}
-            </p>
+            {canManageAttendance ? (
+              <p className="text-sm text-zinc-500 mt-1">
+                Manage attendance and session records for active early care and education providers.
+              </p>
+            ) : (<p className="text-sm text-zinc-500 mt-1">View attendance and session records for active early care and education providers.</p>)}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-600 flex items-center gap-1.5">
@@ -381,13 +381,6 @@ export default function SessionDetailPage() {
             </div>
           </div>
         </div>
-
-        {!canManageAttendance && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Attendance is read-only for this session. You can only mark attendance for
-            sessions hosted by your agency.
-          </div>
-        )}
 
         {session.status === "CANCELLED" && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

@@ -55,21 +55,15 @@ export async function GET(
       throw ApiError.notFound("Session not found");
     }
 
-    if (
-      profile.role === "CCRR_STAFF" &&
-      session.agencyId !== requireCcrrAgencyId(profile)
-    ) {
-      throw ApiError.forbidden(
-        "You can only view registrations for sessions hosted by your agency",
-      );
-    }
-
     const canManageAttendance =
       profile.role === "EEC_ADMIN" || session.agencyId === profile.agencyId;
 
     return jsonSuccess({
       canManageAttendance,
-      canAssistRegistration: profile.role === "CCRR_STAFF" && session.status === "PUBLISHED",
+      canAssistRegistration:
+        profile.role === "CCRR_STAFF" &&
+        session.agencyId === profile.agencyId &&
+        session.status === "PUBLISHED",
       session: {
         id: session.id,
         title: session.title,
@@ -127,6 +121,11 @@ export async function POST(
       ]);
 
       if (!session || session.status !== "PUBLISHED") throw ApiError.notFound("Session not found");
+      if (session.agencyId !== registrationAgencyId) {
+        throw ApiError.forbidden(
+          "You can only register providers for sessions hosted by your agency",
+        );
+      }
       if (session.startsAt <= new Date()) {
         throw ApiError.badRequest("Registration is closed for this session", "REGISTRATION_CLOSED");
       }

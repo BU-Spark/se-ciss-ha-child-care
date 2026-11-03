@@ -17,13 +17,7 @@ export async function GET() {
     const profile = await requireRole(["CCRR_STAFF", "EEC_ADMIN"]);
 
     const sessions = await prisma.orientationSession.findMany({
-      where:
-        profile.role === "EEC_ADMIN"
-          ? { status: SessionStatus.PUBLISHED }
-          : {
-              status: SessionStatus.PUBLISHED,
-              agencyId: requireCcrrAgencyId(profile),
-            },
+      where: { status: SessionStatus.PUBLISHED },
       orderBy: { startsAt: "asc" },
       include: {
         agency: {
@@ -44,9 +38,11 @@ export async function GET() {
     });
 
     return jsonSuccess({
-      sessions: sessions.map((session) =>
-        serializeCcrrSession(session, session._count.registrations),
-      ),
+      sessions: sessions.map((session) => ({
+        ...serializeCcrrSession(session, session._count.registrations),
+        canManage:
+          profile.role === "EEC_ADMIN" || session.agencyId === profile.agencyId,
+      })),
     });
   } catch (error) {
     return handleApiError(error);
