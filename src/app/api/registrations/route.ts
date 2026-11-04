@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { ProviderType } from "@prisma/client";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api/errors";
@@ -7,6 +8,7 @@ import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { linkAppUserForClerk } from "@/lib/auth/link-app-user";
 import { isSupportedLanguage } from "@/lib/languages";
 import { prisma } from "@/lib/db";
+import { sendRegistrationConfirmationEmail } from "@/lib/registration-confirmation-email";
 import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 
 const registrationSchema = z.object({
@@ -182,6 +184,32 @@ export async function POST(request: Request) {
     });
 
     const capacity = result.session.capacity ?? 0;
+
+    after(async () => {
+      try {
+        const registration = await prisma.registration.findUnique({
+          where: { id: result.registration.id },
+          select: { confirmationSentAt: true },
+        });
+
+        if (registration?.confirmationSentAt) return;
+
+        await sendRegistrationConfirmationEmail({
+          to: result.registration.contactEmail,
+          providerName: result.registration.providerName,
+          session: result.session,
+        });
+
+        await prisma.registration.update({
+          where: { id: result.registration.id },
+          data: { confirmationSentAt: new Date() },
+        });
+      } catch (emailError) {
+        // Registration succeeded; a transient email failure must not make a
+        // provider retry and receive a duplicate-registration error.
+        console.error("Registration confirmation email failed", emailError);
+      }
+    });
 
     return jsonSuccess(
       {

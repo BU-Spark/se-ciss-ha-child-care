@@ -181,6 +181,7 @@ model Registration {
   attendanceStatus AttendanceStatus   @default(NOT_MARKED)
   completedAt      DateTime?
   checkedInAt      DateTime?
+  confirmationSentAt DateTime?
   followUpSentAt   DateTime?
   reminderSentAt   DateTime?
   notes            String?
