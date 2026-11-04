@@ -9,6 +9,7 @@ import { PortalNotice } from "@/components/portal-notice";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
 import { SiteFooter } from "@/components/site-footer";
 import { ModalShell } from "@/components/modal-shell";
+import { ProgramLookup, type ProviderProgram } from "@/components/program-lookup";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
 import { formatAppDate, formatAppTimeRange } from "@/lib/datetime";
 
@@ -325,6 +326,13 @@ export default function SessionDetailPage() {
     }
   }
 
+  function handleStaffProgramSelect(program: ProviderProgram) {
+    setStaffForm((current) => ({
+      ...current,
+      stateProviderId: program.stateProviderId,
+    }));
+  }
+
   if (!isLoaded || !userId) return null;
 
   const canEditAttendance =
@@ -531,6 +539,7 @@ export default function SessionDetailPage() {
           footer={<><button type="button" onClick={() => setShowStaffRegistration(false)} disabled={staffRegistrationSaving} className="px-4 py-2 text-sm font-medium text-zinc-600">Cancel</button><button type="button" onClick={handleStaffRegistration} disabled={staffRegistrationSaving} className="rounded-md bg-[#1a2f5e] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{staffRegistrationSaving ? "Registering..." : "Register provider"}</button></>}
         >
           <div className="flex flex-col gap-4">
+            <ProgramLookup onSelect={handleStaffProgramSelect} />
             {([ ["providerName", "Provider name", "text"], ["contactEmail", "Email", "email"], ["phone", "Phone (optional)", "tel"], ["stateProviderId", "Program ID", "text"] ] as const).map(([field, label, type]) => (
               <label key={field} className="flex flex-col gap-1 text-xs font-medium text-zinc-600">{label}<input type={type} value={staffForm[field]} onChange={(event) => setStaffForm((current) => ({ ...current, [field]: event.target.value }))} className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-800" /></label>
             ))}

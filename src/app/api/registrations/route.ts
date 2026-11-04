@@ -17,7 +17,7 @@ const registrationSchema = z.object({
   organizationName: z.string().min(1),
   contactEmail: z.string().email(),
   phone: z.string().optional(),
-  stateProviderId: z.string().trim().min(1, "Program ID is required"),
+  stateProviderId: z.string().trim().optional(),
   providerType: z
     .enum([
       ProviderType.CENTER_BASED,
@@ -47,30 +47,13 @@ export async function POST(request: Request) {
     const clerkUser = await currentUser();
     const primaryEmail =
       clerkUser?.primaryEmailAddress?.emailAddress ?? body.data.contactEmail;
-    const stateProviderId = body.data.stateProviderId;
+    const stateProviderId = body.data.stateProviderId?.trim();
     const preferredLanguage =
       body.data.preferredLanguage && isSupportedLanguage(body.data.preferredLanguage)
         ? body.data.preferredLanguage
         : undefined;
 
     const result = await prisma.$transaction(async (tx) => {
-      const program = await tx.providerProgram.findUnique({
-        where: { stateProviderId },
-        select: {
-          stateProviderId: true,
-          programName: true,
-          providerType: true,
-          isActive: true,
-        },
-      });
-
-      if (!program || !program.isActive) {
-        throw ApiError.badRequest(
-          "Program ID was not found in the active provider directory",
-          "INVALID_PROGRAM_ID",
-        );
-      }
-
       const session = await tx.orientationSession.findUnique({
         where: { id: body.data.sessionId },
         include: {
@@ -110,17 +93,17 @@ export async function POST(request: Request) {
         lastName: clerkUser?.lastName,
         update: {
           providerName: body.data.providerName,
-          organizationName: program.programName,
+          organizationName: body.data.organizationName,
           phone: body.data.phone,
-          providerType: program.providerType,
+          providerType: body.data.providerType,
           ...(preferredLanguage ? { preferredLanguage } : {}),
           ...(stateProviderId ? { stateProviderId } : {}),
         },
         create: {
           providerName: body.data.providerName,
-          organizationName: program.programName,
+          organizationName: body.data.organizationName,
           phone: body.data.phone,
-          providerType: program.providerType,
+          providerType: body.data.providerType,
           preferredLanguage: preferredLanguage ?? "en",
           ...(stateProviderId ? { stateProviderId } : {}),
         },
@@ -136,8 +119,8 @@ export async function POST(request: Request) {
       const existingRegistration = await tx.registration.findFirst({
         where: {
           sessionId: session.id,
+          userId: appUser.id,
           status: { not: "CANCELLED" },
-          OR: [{ userId: appUser.id }, { stateProviderId }],
         },
       });
 
@@ -160,16 +143,19 @@ export async function POST(request: Request) {
         throw ApiError.conflict("This session is full", "SESSION_FULL");
       }
 
+      const registrationStateProviderId =
+        stateProviderId ?? appUser.stateProviderId ?? undefined;
+
       const registration = await tx.registration.create({
         data: {
           sessionId: session.id,
           userId: appUser.id,
           providerName: body.data.providerName,
-          organizationName: program.programName,
+          organizationName: body.data.organizationName,
           contactEmail: body.data.contactEmail,
           phone: body.data.phone,
-          providerType: program.providerType,
-          stateProviderId: program.stateProviderId,
+          providerType: body.data.providerType,
+          stateProviderId: registrationStateProviderId,
           preferredLanguage: preferredLanguage ?? appUser.preferredLanguage,
           status: "REGISTERED",
           attendanceStatus: "NOT_MARKED",

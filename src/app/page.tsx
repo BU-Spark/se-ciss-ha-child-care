@@ -9,11 +9,11 @@ export default function Home() {
       <header className="border-b border-[#e2e6ed] bg-white">
         <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-[#1a2f5e] flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-9 h-7 rounded bg-[#1a2f5e] flex items-center justify-center text-white text-[10px] font-bold">
               M
             </div>
             <span className="font-semibold text-[#1a2f5e] text-sm">
-              EEC Information Sessions
+              EEC Information
             </span>
           </div>
           <HomeAuth />

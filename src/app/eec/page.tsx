@@ -344,7 +344,7 @@ export default function EecPage() {
       case "Audit Logs":
         return "Audit Logs";
       default:
-        return "EEC Information Sessions – Administrator";
+        return "EEC Information Session Management – Administrator";
     }
   }, [activeNav]);
 

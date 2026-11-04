@@ -1,4 +1,5 @@
 import { RegistrationStatus } from "@prisma/client";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api/errors";
@@ -8,6 +9,7 @@ import {
   requireRole,
 } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db";
+import { sendRegistrationConfirmationEmail } from "@/lib/registration-confirmation-email";
 import { rosterRegistrationStatusFilter } from "@/lib/registration-status";
 
 const staffRegistrationSchema = z.object({
@@ -114,7 +116,7 @@ export async function POST(
       throw ApiError.badRequest("Enter a valid provider registration", "INVALID_BODY");
     }
 
-    const registration = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const [session, program] = await Promise.all([
         tx.orientationSession.findUnique({ where: { id: sessionId } }),
         tx.providerProgram.findUnique({ where: { stateProviderId: body.data.stateProviderId } }),
@@ -143,7 +145,7 @@ export async function POST(
         throw ApiError.conflict("This session is full", "SESSION_FULL");
       }
 
-      return tx.registration.create({
+      const registration = await tx.registration.create({
         data: {
           sessionId,
           registrationAgencyId,
@@ -159,19 +161,45 @@ export async function POST(
         },
         include: { registrationAgency: { select: { id: true, name: true } } },
       });
+
+      return { registration, session };
+    });
+
+    after(async () => {
+      try {
+        const registration = await prisma.registration.findUnique({
+          where: { id: result.registration.id },
+          select: { confirmationSentAt: true },
+        });
+
+        if (registration?.confirmationSentAt) return;
+
+        await sendRegistrationConfirmationEmail({
+          to: result.registration.contactEmail,
+          providerName: result.registration.providerName,
+          session: result.session,
+        });
+
+        await prisma.registration.update({
+          where: { id: result.registration.id },
+          data: { confirmationSentAt: new Date() },
+        });
+      } catch (emailError) {
+        console.error("Staff-assisted registration confirmation email failed", emailError);
+      }
     });
 
     return jsonSuccess({
       registration: {
-        id: registration.id,
-        providerName: registration.providerName,
-        organizationName: registration.organizationName,
-        stateProviderId: registration.stateProviderId,
-        contactEmail: registration.contactEmail,
-        attendanceStatus: registration.attendanceStatus,
-        notes: registration.notes,
-        registeredAt: registration.createdAt.toISOString(),
-        registrationAgency: registration.registrationAgency,
+        id: result.registration.id,
+        providerName: result.registration.providerName,
+        organizationName: result.registration.organizationName,
+        stateProviderId: result.registration.stateProviderId,
+        contactEmail: result.registration.contactEmail,
+        attendanceStatus: result.registration.attendanceStatus,
+        notes: result.registration.notes,
+        registeredAt: result.registration.createdAt.toISOString(),
+        registrationAgency: result.registration.registrationAgency,
       },
     }, 201);
   } catch (error) {
