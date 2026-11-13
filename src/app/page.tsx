@@ -13,7 +13,7 @@ export default function Home() {
               M
             </div>
             <span className="font-semibold text-[#1a2f5e] text-sm">
-              EEC Information
+              CCFA Information Sessions
             </span>
           </div>
           <HomeAuth />
