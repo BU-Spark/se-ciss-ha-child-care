@@ -633,11 +633,9 @@ export default function ProviderPage() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 flex flex-col gap-8">
         <PortalNotice message={portalNotice} />
         <div>
-          <h1 className="text-2xl font-bold text-[#1a2f5e]">Information Session Dashboard</h1>
+          <h1 className="text-2xl font-bold text-[#1a2f5e]">CCFA Information Session Dashboard</h1>
           <p className="mt-1 text-sm text-zinc-500 max-w-3xl leading-relaxed">
-            Browse and register for upcoming voucher information sessions across
-            Massachusetts. Center-based providers and family child care
-            providers attend the same information session.
+            Browse the CCFA information sessions below and pick the one that fits your schedule best. Sessions are hosted by CCR&R agencies across Massachusetts, and you’re welcome to join any of them, no matter where your program is located or whether you represent a center or a family child care program. All sessions are held online through Zoom, so you can join from your program, your home, or wherever is easiest for you. Once you register, we’ll email you the Zoom link and everything you need to join.
           </p>
         </div>
 
@@ -663,7 +661,7 @@ export default function ProviderPage() {
         {/* Sessions Grid */}
         <section id="sessions">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-zinc-800">Available Information Sessions</h2>
+            <h2 className="font-semibold text-zinc-800">Available CCFA Information Sessions</h2>
             <span className="text-sm text-zinc-500">{loading ? "Loading..." : `Showing ${sessions.length} results`}</span>
           </div>
           {loading ? (

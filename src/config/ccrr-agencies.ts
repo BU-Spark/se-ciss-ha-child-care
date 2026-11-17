@@ -10,6 +10,8 @@ export type CcrrAgencyResource = {
   state: string;
   zip: string;
   region: string;
+  phone: string;
+  website: string;
   /** When paperwork PDFs are available under /public/resources/ */
   paperwork: {
     label: string;
@@ -27,6 +29,8 @@ export const OFFICIAL_CCRR_AGENCIES: CcrrAgencyResource[] = [
     state: "MA",
     zip: "02111",
     region: "Metro Boston",
+    phone: "617-542-5437",
+    website: "https://cccboston.org",
     paperwork: {
       label: "Required paperwork (PDF)",
       href: "/resources/child-care-choices-of-boston.pdf",
@@ -41,6 +45,8 @@ export const OFFICIAL_CCRR_AGENCIES: CcrrAgencyResource[] = [
     state: "MA",
     zip: "02601",
     region: "Cape and Islands",
+    phone: "508-778-9470",
+    website: "https://www.cacci.cc",
     paperwork: null,
     paperworkStatus: "pending",
   },
@@ -52,6 +58,8 @@ export const OFFICIAL_CCRR_AGENCIES: CcrrAgencyResource[] = [
     state: "MA",
     zip: "01840",
     region: "Northeast",
+    phone: "978-686-4288",
+    website: "https://thecommunitygroupinc.org/child-care-circuit/",
     paperwork: null,
     paperworkStatus: "pending",
   },
@@ -63,6 +71,8 @@ export const OFFICIAL_CCRR_AGENCIES: CcrrAgencyResource[] = [
     state: "MA",
     zip: "02169",
     region: "Metro South",
+    phone: "617-657-5305",
+    website: "https://qcap.org",
     paperwork: null,
     paperworkStatus: "pending",
   },
@@ -74,6 +84,8 @@ export const OFFICIAL_CCRR_AGENCIES: CcrrAgencyResource[] = [
     state: "MA",
     zip: "02740",
     region: "Southeast",
+    phone: "508-999-9930",
+    website: "https://paceinfo.org",
     paperwork: null,
     paperworkStatus: "pending",
   },
@@ -85,6 +97,8 @@ export const OFFICIAL_CCRR_AGENCIES: CcrrAgencyResource[] = [
     state: "MA",
     zip: "01606",
     region: "Central",
+    phone: "508-856-7930",
+    website: "https://www.sevenhills.org",
     paperwork: {
       label: "Required paperwork (PDF)",
       href: "/resources/seven-hills-child-care-resources.pdf",
