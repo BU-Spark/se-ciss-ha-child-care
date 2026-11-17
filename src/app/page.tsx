@@ -26,12 +26,14 @@ export default function Home() {
             Commonwealth of Massachusetts
           </p>
           <h1 className="text-3xl font-bold sm:text-4xl tracking-tight">
-            EEC Information Session Management
+            Welcome to CCFA Information Session Registration!
           </h1>
           <p className="mt-4 text-base text-blue-100 max-w-2xl leading-relaxed">
-            Unified system for early care and education providers to register
-            for information sessions and for CCRR agencies and EEC to track
-            participation statewide.
+            We&apos;re so glad you&apos;re here! This is where Massachusetts child
+            care providers can sign up for an information session about Child
+            Care Financial Assistance (CCFA). These sessions explain how CCFA
+            works, what it means for your program and the families you serve,
+            and how to get started. It only takes a few minutes to register.
           </p>
         </div>
       </div>
@@ -39,24 +41,35 @@ export default function Home() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 pt-12 pb-24">
         <div className="mb-8 rounded-xl border border-blue-100 bg-blue-50 px-5 py-4">
           <p className="text-sm font-medium text-[#1a2f5e]">Getting started</p>
-          <ol className="mt-2 list-decimal pl-5 text-sm text-zinc-600 space-y-1.5 leading-relaxed">
+          <p className="mt-2 text-sm text-zinc-600 leading-relaxed">
+            Let&apos;s get you to the right place. Please choose the box below
+            that describes you:
+          </p>
+          <ul className="mt-3 list-disc pl-5 text-sm text-zinc-600 space-y-1.5 leading-relaxed">
             <li>
-              <strong>Providers:</strong> click <strong>Sign up</strong> with
-              your work email, then open the Provider portal to browse sessions.
+              <strong>Are you a child care provider?</strong>{" "}
+              Choose <strong>Child Care Provider.</strong> You&apos;ll create an
+              account with your work email, and then you can browse upcoming
+              sessions and pick one that fits your schedule.
             </li>
             <li>
-              <strong>CCRR staff</strong> and{" "}
-              <strong>EEC administrators</strong> sign in with accounts
-              provisioned by your team administrator.
+              <strong>Are you on staff at a CCRR agency?</strong>{" "}
+              Choose <strong>CCRR Staff</strong> and sign in with the account
+              your team administrator set up for you.
             </li>
             <li>
-              Already have an account? Use <strong>Sign in</strong> from the
-              header.
+              <strong>Are you staff at EEC?</strong>{" "}
+              Choose <strong>EEC Administrator</strong> and sign in with your
+              EEC account.
             </li>
-          </ol>
+          </ul>
+          <p className="mt-3 text-sm text-zinc-600 leading-relaxed">
+            Already have an account? Welcome back! Click <strong>Sign in</strong>{" "}
+            at the top of the page.
+          </p>
         </div>
         <p className="text-sm font-medium text-zinc-500 mb-3">
-          Select your portal to continue
+          Choose your portal to continue
         </p>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {personas.map((persona) => (

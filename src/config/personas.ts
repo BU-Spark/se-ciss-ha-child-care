@@ -16,7 +16,7 @@ export const personas: Persona[] = [
     title: "Child Care Provider",
     audience: "Providers seeking EEC information sessions",
     description:
-      "Find upcoming information sessions across all Massachusetts CCRR regions, register online, and receive session details by email.",
+      "Find a CCFA information session near you or online, register in a few clicks, and get all the details sent to your email.",
     features: [
       "Browse virtual and in-person sessions statewide",
       "Filter by agency, region, language, date, and format",
@@ -29,7 +29,7 @@ export const personas: Persona[] = [
     title: "CCRR Staff",
     audience: "Regional Child Care Resource and Referral agencies",
     description:
-      "Manage registrations and attendance for your agency’s information sessions without spreadsheets or phone tag.",
+      "See who’s registered for your agency’s sessions, track attendance, and keep everything in one place.",
     features: [
       "Publish sessions and manage attendance for your agency",
       "Manage attendance rosters for your agency",
@@ -42,7 +42,7 @@ export const personas: Persona[] = [
     title: "EEC Administrator",
     audience: "Massachusetts Department of Early Education and Care",
     description:
-      "Monitor information session participation statewide with filters and exports to support program oversight and reporting.",
+      "View information session participation across the state, with filters and downloads to support reporting.",
     features: [
       "Statewide registration and completion data",
       "Filter by agency, region, language, date, and provider type",
