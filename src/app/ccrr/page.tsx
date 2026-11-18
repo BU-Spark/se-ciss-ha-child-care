@@ -8,7 +8,6 @@ import { PersonaNav } from "@/components/persona-nav";
 import { CreateSessionModal } from "@/components/create-session-modal";
 import { PortalNotice } from "@/components/portal-notice";
 import { PersonaGuardBoundary } from "@/components/persona-guard-boundary";
-import { ResourcesSection } from "@/components/resources-section";
 import { SiteFooter } from "@/components/site-footer";
 import { usePersonaGuard } from "@/hooks/use-persona-guard";
 import {
@@ -104,18 +103,29 @@ function SessionCard({
         <button
           type="button"
           onClick={() => router.push(`/ccrr/sessions/${session.id}`)}
-          className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
+          className="w-full border border-[#1a2f5e] text-[#1a2f5e] py-2 rounded-md text-sm font-medium hover:bg-blue-50 transition-colors"
         >
-          {session.canManage ? "Manage Attendance →" : "View Attendance →"}
+          View Registrations →
         </button>
-        {session.canManage && <button
-          type="button"
-          onClick={() => onCancel(session.id)}
-          disabled={cancelling}
-          className="w-full border border-red-200 text-red-700 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
-        >
-          {cancelling ? "Cancelling..." : "Cancel session"}
-        </button>}
+        {session.canManage && (
+          <>
+            <button
+              type="button"
+              onClick={() => router.push(`/ccrr/sessions/${session.id}#attendance`)}
+              className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
+            >
+              Enter Attendance →
+            </button>
+            <button
+              type="button"
+              onClick={() => onCancel(session.id)}
+              disabled={cancelling}
+              className="w-full border border-red-200 text-red-700 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              {cancelling ? "Removing..." : "− Remove Session"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -251,8 +261,16 @@ export default function CcrrPage() {
         <PortalNotice message={portalNotice} />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#1a2f5e]">Staff Dashboard</h1>
-            <p className="mt-1 text-sm text-zinc-500 max-w-lg">Manage upcoming information sessions, track registration progress, and export agency attendance data for federal compliance.</p>
+            <h1 className="text-2xl font-bold text-[#1a2f5e]">CCRR Staff Dashboard</h1>
+            <p className="mt-1 text-sm text-zinc-500 max-w-lg">Use this page to schedule and manage your agency’s CCFA information sessions, record
+              who attended, and export attendance data for your own tracking.</p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-600 leading-relaxed">
+              <li><strong>Add a session:</strong> Click <strong>+ Add Session</strong>.</li>
+              <li><strong>Remove a session:</strong> Click <strong>− Remove Session</strong>.</li>
+              <li><strong>See who has registered:</strong> Click <strong>View Registrations</strong> on the session you want to check.</li>
+              <li><strong>Record attendance:</strong> Click <strong>Enter Attendance</strong> on that session.</li>
+              <li><strong>Export data:</strong> Click <strong>Export All Data</strong> to download attendance records.</li>
+            </ul>
             {exportError && (
               <p className="mt-2 text-sm text-red-600">{exportError}</p>
             )}
@@ -278,7 +296,7 @@ export default function CcrrPage() {
                 onClick={() => setShowCreateModal(true)}
                 className="bg-[#1a2f5e] text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
               >
-                + Add session
+                + Add Session
               </button>
             </div>
           </div>
@@ -342,7 +360,6 @@ export default function CcrrPage() {
           />
         )}
 
-        <ResourcesSection />
       </main>
       <SiteFooter />
     </div>
