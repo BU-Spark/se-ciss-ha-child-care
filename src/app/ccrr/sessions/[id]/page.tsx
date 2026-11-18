@@ -140,6 +140,19 @@ export default function SessionDetailPage() {
   const [staffForm, setStaffForm] = useState({ providerName: "", contactEmail: "", phone: "", stateProviderId: "" });
   const [staffRegistrationError, setStaffRegistrationError] = useState<string | null>(null);
   const [staffRegistrationSaving, setStaffRegistrationSaving] = useState(false);
+  const [isReadOnlyView, setIsReadOnlyView] = useState(false);
+
+  useEffect(() => {
+    function syncViewMode() {
+      setIsReadOnlyView(
+        new URLSearchParams(window.location.search).get("mode") === "view",
+      );
+    }
+
+    syncViewMode();
+    window.addEventListener("popstate", syncViewMode);
+    return () => window.removeEventListener("popstate", syncViewMode);
+  }, []);
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -336,7 +349,9 @@ export default function SessionDetailPage() {
   if (!isLoaded || !userId) return null;
 
   const canEditAttendance =
-    canManageAttendance && session?.status !== "CANCELLED";
+    !isReadOnlyView && canManageAttendance && session?.status !== "CANCELLED";
+  const canPerformStaffRegistration =
+    !isReadOnlyView && canAssistRegistration;
 
   return (
     <PersonaGuardBoundary
@@ -374,7 +389,7 @@ export default function SessionDetailPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#1a2f5e]">{session.title}</h1>
-            {canManageAttendance ? (
+            {canEditAttendance ? (
               <p className="text-sm text-zinc-500 mt-1">
                 Manage attendance and session records for active early care and education providers.
               </p>
@@ -415,7 +430,7 @@ export default function SessionDetailPage() {
           ))}
         </div>
 
-        <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
+        <div id="attendance" className="scroll-mt-20 bg-white border border-zinc-200 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
             <thead>
@@ -501,9 +516,9 @@ export default function SessionDetailPage() {
               <span className="text-sm text-red-600">{saveError}</span>
             )}
           </div>
-          {(canEditAttendance || canAssistRegistration) && (
+          {(canEditAttendance || canPerformStaffRegistration) && (
             <div className="flex items-center gap-3">
-              {canAssistRegistration && (
+              {canPerformStaffRegistration && (
                 <button type="button" onClick={() => { setStaffRegistrationError(null); setShowStaffRegistration(true); }} className="border border-[#1a2f5e] text-[#1a2f5e] px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-50 transition-colors">
                   + Staff-assisted registration
                 </button>
@@ -514,16 +529,17 @@ export default function SessionDetailPage() {
                 disabled={cancelling}
                 className="border border-red-200 text-red-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
               >
-                {cancelling ? "Cancelling..." : "Cancel session"}
+                {cancelling ? "Removing..." : "− Remove Session"}
               </button>}
               {canEditAttendance && <button
+                id="mark-attendance"
                 type="button"
                 onClick={handleMarkAttendance}
                 disabled={saving || providers.length === 0}
-                className="flex items-center gap-2 bg-[#1a2f5e] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors disabled:opacity-50"
+                className="scroll-mt-20 flex items-center gap-2 bg-[#1a2f5e] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                {saving ? "Saving..." : "Mark Attendance"}
+                {saving ? "Saving..." : "Enter Attendance"}
               </button>}
             </div>
           )}

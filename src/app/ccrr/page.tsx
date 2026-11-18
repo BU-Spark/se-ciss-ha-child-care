@@ -102,19 +102,19 @@ function SessionCard({
       <div className="flex flex-col gap-2">
         <button
           type="button"
-          onClick={() => router.push(`/ccrr/sessions/${session.id}`)}
-          className="w-full border border-[#1a2f5e] text-[#1a2f5e] py-2 rounded-md text-sm font-medium hover:bg-blue-50 transition-colors"
+          onClick={() => router.push(`/ccrr/sessions/${session.id}?mode=view`)}
+          className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
         >
-          View Registrations →
+          View Attendance
         </button>
         {session.canManage && (
           <>
             <button
               type="button"
-              onClick={() => router.push(`/ccrr/sessions/${session.id}#attendance`)}
-              className="w-full bg-[#1a2f5e] text-white py-2 rounded-md text-sm font-medium hover:bg-[#152548] transition-colors"
+              onClick={() => router.push(`/ccrr/sessions/${session.id}?mode=edit#mark-attendance`)}
+              className="w-full border border-[#1a2f5e] text-[#1a2f5e] py-2 rounded-md text-sm font-medium hover:bg-blue-50 transition-colors"
             >
-              Enter Attendance →
+              Enter Attendance
             </button>
             <button
               type="button"
@@ -267,7 +267,7 @@ export default function CcrrPage() {
             <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-600 leading-relaxed">
               <li><strong>Add a session:</strong> Click <strong>+ Add Session</strong>.</li>
               <li><strong>Remove a session:</strong> Click <strong>− Remove Session</strong>.</li>
-              <li><strong>See who has registered:</strong> Click <strong>View Registrations</strong> on the session you want to check.</li>
+              <li><strong>See who has registered:</strong> Click <strong>View Attendance</strong> on the session you want to check.</li>
               <li><strong>Record attendance:</strong> Click <strong>Enter Attendance</strong> on that session.</li>
               <li><strong>Export data:</strong> Click <strong>Export All Data</strong> to download attendance records.</li>
             </ul>
