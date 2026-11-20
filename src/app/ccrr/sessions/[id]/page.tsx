@@ -467,7 +467,7 @@ export default function SessionDetailPage() {
                           }
                           className="border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e]"
                         >
-                          <option value="NOT_MARKED">Not marked</option>
+                          <option value="NOT_MARKED">Registered</option>
                           <option value="ATTENDED">Attended</option>
                           <option value="NO_SHOW">No-show</option>
                         </select>
@@ -477,7 +477,7 @@ export default function SessionDetailPage() {
                             ? "Attended"
                             : provider.attendanceStatus === "NO_SHOW"
                               ? "No-show"
-                              : "Not marked"}
+                              : "Registered"}
                         </span>
                       )}
                     </td>

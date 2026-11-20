@@ -6,13 +6,15 @@ export async function GET() {
   try {
     const agencies = await prisma.agency.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, region: true },
+      select: { id: true, name: true, region: true, additionalRegions: true },
       orderBy: [{ region: "asc" }, { name: "asc" }],
     });
 
     return jsonSuccess({
       agencies,
-      regions: Array.from(new Set(agencies.map((agency) => agency.region))).sort(),
+      regions: Array.from(
+        new Set(agencies.flatMap((agency) => [agency.region, ...agency.additionalRegions])),
+      ).sort(),
       languages: SUPPORTED_LANGUAGES,
     });
   } catch (error) {

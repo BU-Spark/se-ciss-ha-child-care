@@ -4,29 +4,116 @@ import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 import { prisma } from "@/lib/db";
 
-export async function GET() {
+type TrendRegistration = { createdAt: Date };
+
+function startOfUtcDay(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function buildRegistrationsOverTime(
+  registrations: TrendRegistration[],
+  dateRange: string | null,
+  now: Date,
+) {
+  const range = dateRange ?? "Last 30 Days";
+  const today = startOfUtcDay(now);
+  const buckets: { start: Date; end: Date; label: string }[] = [];
+  let periodLabel = "Day";
+
+  if (range === "All Time") {
+    periodLabel = "Month";
+    const firstRegistration = registrations.reduce<Date | null>(
+      (earliest, registration) =>
+        !earliest || registration.createdAt < earliest
+          ? registration.createdAt
+          : earliest,
+      null,
+    );
+    const firstMonth = firstRegistration
+      ? new Date(Date.UTC(firstRegistration.getUTCFullYear(), firstRegistration.getUTCMonth(), 1))
+      : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const finalMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+    for (let start = firstMonth; start <= finalMonth; start = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1))) {
+      const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+      buckets.push({
+        start,
+        end,
+        label: start.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }),
+      });
+    }
+  } else if (range === "Last 90 Days") {
+    periodLabel = "Week starting";
+    for (let index = 12; index >= 0; index -= 1) {
+      const start = new Date(today);
+      start.setUTCDate(start.getUTCDate() - index * 7);
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 7);
+      buckets.push({
+        start,
+        end,
+        label: start.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
+      });
+    }
+  } else {
+    const days = range === "Last 7 Days" ? 7 : 30;
+    for (let index = days - 1; index >= 0; index -= 1) {
+      const start = new Date(today);
+      start.setUTCDate(start.getUTCDate() - index);
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 1);
+      buckets.push({
+        start,
+        end,
+        label: start.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
+      });
+    }
+  }
+
+  return {
+    periodLabel,
+    points: buckets.map((bucket) => ({
+      label: bucket.label,
+      count: registrations.filter(
+        (registration) =>
+          registration.createdAt >= bucket.start && registration.createdAt < bucket.end,
+      ).length,
+    })),
+  };
+}
+
+export async function GET(request: Request) {
   try {
     await requireRole(["EEC_ADMIN"]);
 
     const now = new Date();
+    const { searchParams } = new URL(request.url);
+    const trendDateRange = searchParams.get("trendDateRange");
 
     const [
       totalRegistrations,
       totalCompletions,
-      activeSessions,
-      agenciesCount,
+      conductedSessions,
       agencies,
       registrations,
     ] = await Promise.all([
       prisma.registration.count({ where: activeRegistrationStatusFilter }),
       prisma.registration.count({ where: { status: "ATTENDED" } }),
-      prisma.orientationSession.count({
-        where: { status: "PUBLISHED", startsAt: { gte: now } },
+      prisma.orientationSession.findMany({
+        where: {
+          status: { not: "CANCELLED" },
+          endsAt: { lt: now },
+        },
+        select: {
+          registrations: {
+            where: activeRegistrationStatusFilter,
+            select: { status: true },
+          },
+        },
       }),
-      prisma.agency.count({ where: { isActive: true } }),
       prisma.agency.findMany({
         where: { isActive: true },
-        select: { name: true, region: true },
+        select: { name: true, region: true, additionalRegions: true },
         orderBy: { name: "asc" },
       }),
       prisma.registration.findMany({
@@ -38,6 +125,27 @@ export async function GET() {
         },
       }),
     ]);
+
+    const sessionsConducted = conductedSessions.length;
+    const averageAttendeesPerSession =
+      sessionsConducted > 0
+        ? Math.round((totalCompletions / sessionsConducted) * 10) / 10
+        : 0;
+    const averageAttendanceRatePerSession =
+      sessionsConducted > 0
+        ? Math.round(
+            (conductedSessions.reduce((total, session) => {
+              const registered = session.registrations.length;
+              const attendees = session.registrations.filter(
+                (registration) => registration.status === "ATTENDED",
+              ).length;
+
+              return total + (registered > 0 ? attendees / registered : 0);
+            }, 0) *
+              1000) /
+              sessionsConducted,
+          ) / 10
+        : 0;
 
     const regionMap = new Map<string, { total: number; attended: number }>();
 
@@ -51,45 +159,32 @@ export async function GET() {
       regionMap.set(region, entry);
     }
 
-    const regionalCompletion = Array.from(regionMap.entries())
-      .map(([region, counts]) => ({
+    const sessionRegions = Array.from(
+      new Set(agencies.flatMap((agency) => [agency.region, ...agency.additionalRegions])),
+    ).sort();
+    const regionalCompletion = sessionRegions.map((region) => {
+      const counts = regionMap.get(region) ?? { total: 0, attended: 0 };
+
+      return {
         region,
         rate:
           counts.total > 0
             ? Math.round((counts.attended / counts.total) * 100)
             : 0,
-      }))
-      .sort((a, b) => a.region.localeCompare(b.region));
+      };
+    });
 
-    const regionCount = regionMap.size;
+    const regionCount = sessionRegions.length;
     const completionRate =
       totalRegistrations > 0
         ? Math.round((totalCompletions / totalRegistrations) * 1000) / 10
         : 0;
 
-    const bucketStarts: Date[] = [];
-    for (let index = 7; index >= 0; index -= 1) {
-      const start = new Date(now);
-      start.setUTCDate(start.getUTCDate() - index * 7);
-      start.setUTCHours(0, 0, 0, 0);
-      bucketStarts.push(start);
-    }
-
-    const registrationsOverTime = bucketStarts.map((start, index) => {
-      const end = bucketStarts[index + 1] ?? new Date(now.getTime() + 86_400_000);
-      const count = registrations.filter(
-        (registration) =>
-          registration.createdAt >= start && registration.createdAt < end,
-      ).length;
-
-      return {
-        label: start.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        }),
-        count,
-      };
-    });
+    const registrationsOverTime = buildRegistrationsOverTime(
+      registrations,
+      trendDateRange,
+      now,
+    );
 
     const agenciesWithStats = await prisma.agency.findMany({
       where: { isActive: true },
@@ -114,6 +209,25 @@ export async function GET() {
       const completions = sessionRegistrations.filter(
         (registration) => registration.status === "ATTENDED",
       ).length;
+      const averageAttendeesPerSession =
+        entry.sessions.length > 0
+          ? Math.round((completions / entry.sessions.length) * 10) / 10
+          : 0;
+      const averageAttendanceRatePerSession =
+        entry.sessions.length > 0
+          ? Math.round(
+              entry.sessions.reduce((total, session) => {
+                const registrants = session.registrations.length;
+                const attendees = session.registrations.filter(
+                  (registration) => registration.status === "ATTENDED",
+                ).length;
+
+                return total + (registrants > 0 ? attendees / registrants : 0);
+              }, 0) /
+                entry.sessions.length *
+                100,
+            )
+          : 0;
 
       return {
         agency: entry.name,
@@ -121,6 +235,8 @@ export async function GET() {
         sessions: entry.sessions.length,
         registrations: sessionRegistrations.length,
         completions,
+        averageAttendeesPerSession,
+        averageAttendanceRatePerSession,
         completionRate:
           sessionRegistrations.length > 0
             ? Math.round((completions / sessionRegistrations.length) * 100)
@@ -173,19 +289,23 @@ export async function GET() {
         totalRegistrations,
         totalCompletions,
         completionRate,
-        activeSessions,
-        agenciesCount,
+        sessionsConducted,
+        averageAttendeesPerSession,
+        averageAttendanceRatePerSession,
         regionCount,
       },
       regionalCompletion,
-      registrationsOverTime,
+      registrationsOverTime: registrationsOverTime.points,
+      registrationsOverTimePeriod: registrationsOverTime.periodLabel,
       agencyCompliance,
       auditLogs,
       filterOptions: {
         agencies: ["All Agencies", ...agencies.map((agency) => agency.name)],
         regions: [
           "All Regions",
-          ...Array.from(new Set(agencies.map((agency) => agency.region))).sort(),
+          ...Array.from(
+            new Set(agencies.flatMap((agency) => [agency.region, ...agency.additionalRegions])),
+          ).sort(),
         ],
         languages: [
           "All Languages",

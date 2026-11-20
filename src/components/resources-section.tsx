@@ -122,7 +122,9 @@ export function ResourcesSection() {
                 <h3 className="font-semibold text-[#1a2f5e] text-sm leading-snug">
                   {agency.name}
                 </h3>
-                <p className="mt-0.5 text-xs text-zinc-500">{agency.region}</p>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  {[agency.region, ...(agency.additionalRegions ?? [])].join(" and ")}
+                </p>
               </div>
               {agency.paperworkStatus === "available" ? (
                 <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">

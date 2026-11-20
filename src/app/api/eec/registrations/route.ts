@@ -1,8 +1,7 @@
-import { ProviderType } from "@prisma/client";
+import { ProviderType, RegistrationStatus } from "@prisma/client";
 import { handleApiError, jsonSuccess } from "@/lib/api/response";
 import { requireRole } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db";
-import { activeRegistrationStatusFilter } from "@/lib/registration-status";
 
 function parseProviderType(value: string | null) {
   if (!value || value === "All Types") {
@@ -24,6 +23,20 @@ function parseProviderType(value: string | null) {
   }
 
   return undefined;
+}
+
+function parseAttendanceStatuses(values: string[]) {
+  const statusByLabel: Record<string, RegistrationStatus> = {
+    Registered: RegistrationStatus.REGISTERED,
+    Attended: RegistrationStatus.ATTENDED,
+    "No-show": RegistrationStatus.NO_SHOW,
+    Waitlisted: RegistrationStatus.WAITLISTED,
+    Cancelled: RegistrationStatus.CANCELLED,
+  };
+
+  return values
+    .map((value) => statusByLabel[value])
+    .filter((status): status is RegistrationStatus => Boolean(status));
 }
 
 function getRegistrationDateBounds(dateRange: string | null, now: Date) {
@@ -91,12 +104,17 @@ export async function GET(request: Request) {
     const language = searchParams.get("language");
     const dateRange = searchParams.get("dateRange");
     const providerType = parseProviderType(searchParams.get("providerType"));
+    const attendanceStatuses = parseAttendanceStatuses(
+      searchParams.getAll("attendanceStatus"),
+    );
     const now = new Date();
     const registrationDate = getRegistrationDateBounds(dateRange, now);
 
     const registrations = await prisma.registration.findMany({
       where: {
-        ...activeRegistrationStatusFilter,
+        ...(attendanceStatuses.length > 0
+          ? { status: { in: attendanceStatuses } }
+          : {}),
         ...(registrationDate ? { createdAt: registrationDate } : {}),
         ...(providerType
           ? { providerType: providerType as string }

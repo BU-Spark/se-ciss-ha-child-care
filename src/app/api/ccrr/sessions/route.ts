@@ -36,6 +36,13 @@ export async function GET() {
         },
       },
     });
+    const staffAgency =
+      profile.role === "CCRR_STAFF" && profile.agencyId
+        ? await prisma.agency.findUnique({
+            where: { id: profile.agencyId },
+            select: { region: true, additionalRegions: true },
+          })
+        : null;
 
     return jsonSuccess({
       sessions: sessions.map((session) => ({
@@ -43,6 +50,9 @@ export async function GET() {
         canManage:
           profile.role === "EEC_ADMIN" || session.agencyId === profile.agencyId,
       })),
+      createSessionRegions: staffAgency
+        ? [staffAgency.region, ...staffAgency.additionalRegions]
+        : [],
     });
   } catch (error) {
     return handleApiError(error);
@@ -65,11 +75,21 @@ export async function POST(request: Request) {
 
     const agency = await prisma.agency.findUnique({
       where: { id: agencyId },
-      select: { id: true, name: true, region: true, isActive: true },
+      select: { id: true, name: true, region: true, additionalRegions: true, isActive: true },
     });
 
     if (!agency || !agency.isActive) {
       throw ApiError.notFound("Agency not found");
+    }
+
+    const availableRegions = [agency.region, ...agency.additionalRegions];
+    const region = body.data.region ?? agency.region;
+
+    if (!availableRegions.includes(region)) {
+      throw ApiError.badRequest(
+        "Session region must be assigned to your CCRR agency",
+        "INVALID_SESSION_REGION",
+      );
     }
 
     const startsAt = parseSessionDateTime(body.data.startsAt, "startsAt");
@@ -81,7 +101,7 @@ export async function POST(request: Request) {
         agencyId: agency.id,
         title: body.data.title,
         description: body.data.description,
-        region: agency.region,
+        region,
         language: body.data.language,
         format: body.data.format,
         status: SessionStatus.PUBLISHED,

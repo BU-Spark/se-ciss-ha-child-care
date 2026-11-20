@@ -1,0 +1,2 @@
+ALTER TABLE "CcrrAgency"
+ADD COLUMN "additionalRegions" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

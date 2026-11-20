@@ -141,6 +141,7 @@ export default function CcrrPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createSessionRegions, setCreateSessionRegions] = useState<string[]>([]);
   const [sessionsKey, setSessionsKey] = useState(0);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [sessionActionError, setSessionActionError] = useState<string | null>(null);
@@ -168,6 +169,7 @@ export default function CcrrPage() {
           .map(mapSession);
 
         setSessions(upcoming);
+        setCreateSessionRegions(json.data.createSessionRegions ?? []);
       } catch {
         setError("Network error. Please try again.");
         setSessions([]);
@@ -355,6 +357,7 @@ export default function CcrrPage() {
 
         {showCreateModal && (
           <CreateSessionModal
+            regions={createSessionRegions}
             onClose={() => setShowCreateModal(false)}
             onSuccess={() => setSessionsKey((value) => value + 1)}
           />

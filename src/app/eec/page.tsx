@@ -40,8 +40,9 @@ type EecStats = {
   totalRegistrations: number;
   totalCompletions: number;
   completionRate: number;
-  activeSessions: number;
-  agenciesCount: number;
+  sessionsConducted: number;
+  averageAttendeesPerSession: number;
+  averageAttendanceRatePerSession: number;
   regionCount: number;
 };
 
@@ -53,6 +54,8 @@ type AgencyCompliance = {
   sessions: number;
   registrations: number;
   completions: number;
+  averageAttendeesPerSession: number;
+  averageAttendanceRatePerSession: number;
   completionRate: number;
 };
 type AuditLog = {
@@ -63,9 +66,16 @@ type AuditLog = {
   agency: string;
 };
 
-const NAV_ITEMS = ["Overview", "Registration Data", "Agency Compliance", "Audit Logs"];
+const NAV_ITEMS = ["Overview", "Registration Data", "CCRR Statistics", "Registration Changes"];
 const DATE_RANGES = ["Last 30 Days", "Last 7 Days", "Last 90 Days", "All Time"];
 const PROVIDER_TYPES = ["All Types", "Center-based", "Family-based", "School-age"];
+const ATTENDANCE_STATUSES = [
+  "Registered",
+  "Attended",
+  "No-show",
+  "Waitlisted",
+  "Cancelled",
+];
 
 function StatusBadge({ status }: { status: Registration["status"] }) {
   const styles = {
@@ -132,55 +142,184 @@ function StatsCards({ stats }: { stats: EecStats | null }) {
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {[
         {
-          label: "TOTAL REGISTRATIONS",
+          label: "TOTAL REGISTRANTS",
           value: stats?.totalRegistrations.toLocaleString() ?? "—",
-          sub: "Statewide enrollments",
         },
         {
-          label: "TOTAL COMPLETIONS",
+          label: "TOTAL ATTENDEES",
           value: stats?.totalCompletions.toLocaleString() ?? "—",
           sub: stats ? `${stats.completionRate}% Rate` : "—",
         },
         {
-          label: "ACTIVE SESSIONS",
-          value: stats?.activeSessions.toLocaleString() ?? "—",
-          sub: stats ? `Across ${stats.regionCount} Regions` : "—",
+          label: "SESSIONS CONDUCTED",
+          value: stats?.sessionsConducted.toLocaleString() ?? "—",
+          sub: "Completed sessions to date",
         },
         {
-          label: "CCRR AGENCIES",
-          value: stats?.agenciesCount.toLocaleString() ?? "—",
-          sub: "Active Network",
+          label: "AVERAGE ATTENDEES PER SESSION",
+          value: stats?.averageAttendeesPerSession.toFixed(1) ?? "—",
+          sub: stats
+            ? `Average attendance rate: ${stats.averageAttendanceRatePerSession}%`
+            : "—",
         },
       ].map((stat) => (
         <div key={stat.label} className="bg-white border border-zinc-200 rounded-lg p-4">
           <p className="text-xs text-zinc-400 font-medium uppercase tracking-wide">{stat.label}</p>
           <p className="text-2xl font-bold text-zinc-800 mt-1">{stat.value}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">{stat.sub}</p>
+          {stat.sub ? (
+            <p className="text-xs text-zinc-500 mt-0.5">{stat.sub}</p>
+          ) : null}
         </div>
       ))}
     </div>
   );
 }
 
-function TrendChart({ trend, maxTrend }: { trend: TrendPoint[]; maxTrend: number }) {
+function TrendChart({
+  trend,
+  maxTrend,
+  dateRange,
+  onDateRangeChange,
+  periodLabel,
+}: {
+  trend: TrendPoint[];
+  maxTrend: number;
+  dateRange: string;
+  onDateRangeChange: (value: string) => void;
+  periodLabel: string;
+}) {
+  const width = 560;
+  const height = 250;
+  const margin = { top: 18, right: 16, bottom: 46, left: 48 };
+  const chartWidth = width - margin.left - margin.right;
+  const chartHeight = height - margin.top - margin.bottom;
+  const yMax = Math.max(5, Math.ceil(maxTrend / 5) * 5);
+  const yTicks = Array.from({ length: 5 }, (_, index) => (yMax / 4) * index);
+  const pointX = (index: number) =>
+    margin.left +
+    (trend.length > 1 ? (index / (trend.length - 1)) * chartWidth : chartWidth / 2);
+  const pointY = (count: number) => margin.top + chartHeight - (count / yMax) * chartHeight;
+  const linePoints = trend
+    .map((point, index) => `${pointX(index)},${pointY(point.count)}`)
+    .join(" ");
+  const xLabelInterval = Math.max(1, Math.ceil(trend.length / 8));
+
   return (
     <div className="bg-white border border-zinc-200 rounded-lg p-4">
-      <p className="text-sm font-semibold text-zinc-800 mb-3">Registrations Over Time</p>
-      <div className="flex items-end gap-1 h-16">
-        {trend.map((point, index, arr) => (
-          <div
-            key={point.label}
-            className={`flex-1 rounded-sm ${index === arr.length - 1 ? "bg-[#1a2f5e]" : "bg-blue-100"}`}
-            style={{ height: `${(point.count / maxTrend) * 100}%` }}
-            title={`${point.label}: ${point.count}`}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-zinc-800">Registrants Over Time</p>
+        <label className="flex items-center gap-2 text-xs text-zinc-500">
+          Date range
+          <select
+            value={dateRange}
+            onChange={(event) => onDateRangeChange(event.target.value)}
+            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e]"
+          >
+            {DATE_RANGES.map((range) => (
+              <option key={range} value={range}>{range}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {trend.length === 0 ? (
+        <p className="py-16 text-center text-xs text-zinc-400">No registrant data yet.</p>
+      ) : (
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="h-56 w-full"
+          role="img"
+          aria-label="Line chart showing registrants by week"
+        >
+          {yTicks.map((tick) => {
+            const y = pointY(tick);
+            return (
+              <g key={tick}>
+                <line
+                  x1={margin.left}
+                  x2={width - margin.right}
+                  y1={y}
+                  y2={y}
+                  stroke="#e4e4e7"
+                  strokeWidth="1"
+                />
+                <text
+                  x={margin.left - 8}
+                  y={y + 4}
+                  textAnchor="end"
+                  className="fill-zinc-500 text-[11px]"
+                >
+                  {tick}
+                </text>
+              </g>
+            );
+          })}
+          <line
+            x1={margin.left}
+            x2={width - margin.right}
+            y1={margin.top + chartHeight}
+            y2={margin.top + chartHeight}
+            stroke="#a1a1aa"
+            strokeWidth="1"
           />
-        ))}
-      </div>
-      <div className="flex justify-between mt-2 text-xs text-zinc-400">
-        {trend.filter((_, index) => index % 2 === 0).map((point) => (
-          <span key={point.label}>{point.label}</span>
-        ))}
-      </div>
+          <line
+            x1={margin.left}
+            x2={margin.left}
+            y1={margin.top}
+            y2={margin.top + chartHeight}
+            stroke="#a1a1aa"
+            strokeWidth="1"
+          />
+          <polyline
+            points={linePoints}
+            fill="none"
+            stroke="#1a2f5e"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {trend.map((point, index) => (
+            <g key={point.label}>
+              <circle
+                cx={pointX(index)}
+                cy={pointY(point.count)}
+                r="4"
+                fill="#1a2f5e"
+              >
+                <title>{`${point.label}: ${point.count} registrants`}</title>
+              </circle>
+              {(index === trend.length - 1 ||
+                (index % xLabelInterval === 0 &&
+                  trend.length - 1 - index >= 2)) && (
+                <text
+                  x={pointX(index)}
+                  y={margin.top + chartHeight + 18}
+                  textAnchor="middle"
+                  className="fill-zinc-500 text-[10px]"
+                >
+                  {point.label}
+                </text>
+              )}
+            </g>
+          ))}
+          <text
+            x={margin.left + chartWidth / 2}
+            y={height - 4}
+            textAnchor="middle"
+            className="fill-zinc-600 text-[11px] font-medium"
+          >
+            {periodLabel}
+          </text>
+          <text
+            x="14"
+            y={margin.top + chartHeight / 2}
+            textAnchor="middle"
+            transform={`rotate(-90 14 ${margin.top + chartHeight / 2})`}
+            className="fill-zinc-600 text-[11px] font-medium"
+          >
+            Registrants
+          </text>
+        </svg>
+      )}
     </div>
   );
 }
@@ -188,7 +327,11 @@ function TrendChart({ trend, maxTrend }: { trend: TrendPoint[]; maxTrend: number
 function RegionalCompletionPanel({ regionalRates }: { regionalRates: RegionalRate[] }) {
   return (
     <div className="bg-white border border-zinc-200 rounded-lg p-4">
-      <p className="text-sm font-semibold text-zinc-800 mb-3">Regional Completion Rate</p>
+      <p className="text-sm font-semibold text-zinc-800">Regional Attendance Rates</p>
+      <p className="mt-0.5 mb-3 text-xs text-zinc-500">
+        Based on the information session&apos;s CCRR region, not the provider&apos;s
+        licensing or subsidy region.
+      </p>
       <div className="flex flex-col gap-2.5">
         {regionalRates.length === 0 ? (
           <p className="text-xs text-zinc-400">No completion data yet.</p>
@@ -219,9 +362,11 @@ export default function EecPage() {
   const [dateRange, setDateRange] = useState("Last 30 Days");
   const [providerType, setProviderType] = useState("All Types");
   const [language, setLanguage] = useState("All Languages");
+  const [attendanceStatuses, setAttendanceStatuses] = useState<string[]>([]);
   const [stats, setStats] = useState<EecStats | null>(null);
   const [regionalRates, setRegionalRates] = useState<RegionalRate[]>([]);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [trendPeriodLabel, setTrendPeriodLabel] = useState("Day");
   const [agencyCompliance, setAgencyCompliance] = useState<AgencyCompliance[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -254,7 +399,8 @@ export default function EecPage() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const res = await fetch("/api/eec/stats");
+        const params = new URLSearchParams({ trendDateRange: dateRange });
+        const res = await fetch(`/api/eec/stats?${params.toString()}`);
         const json = await res.json();
 
         if (!res.ok || !json.success) {
@@ -265,6 +411,7 @@ export default function EecPage() {
         setStats(json.data.stats);
         setRegionalRates(json.data.regionalCompletion);
         setTrend(json.data.registrationsOverTime);
+        setTrendPeriodLabel(json.data.registrationsOverTimePeriod ?? "Day");
         setAgencyCompliance(json.data.agencyCompliance ?? []);
         setAuditLogs(json.data.auditLogs ?? []);
         setAgencies(json.data.filterOptions.agencies);
@@ -278,7 +425,7 @@ export default function EecPage() {
     if (canLoadData) {
       loadStats();
     }
-  }, [canLoadData]);
+  }, [canLoadData, dateRange]);
 
   useEffect(() => {
     async function loadRegistrations() {
@@ -292,6 +439,9 @@ export default function EecPage() {
         if (dateRange) params.set("dateRange", dateRange);
         if (providerType !== "All Types") params.set("providerType", providerType);
         if (language !== "All Languages") params.set("language", language);
+        attendanceStatuses.forEach((status) =>
+          params.append("attendanceStatus", status),
+        );
 
         const res = await fetch(`/api/eec/registrations?${params.toString()}`);
         const json = await res.json();
@@ -314,7 +464,7 @@ export default function EecPage() {
     if (canLoadData) {
       loadRegistrations();
     }
-  }, [canLoadData, agency, region, dateRange, providerType, language]);
+  }, [canLoadData, agency, region, dateRange, providerType, language, attendanceStatuses]);
 
   const maxTrend = useMemo(
     () => Math.max(...trend.map((point) => point.count), 1),
@@ -339,10 +489,10 @@ export default function EecPage() {
     switch (activeNav) {
       case "Registration Data":
         return "Registration Data";
-      case "Agency Compliance":
-        return "Agency Compliance";
-      case "Audit Logs":
-        return "Audit Logs";
+      case "CCRR Statistics":
+        return "CCRR Statistics";
+      case "Registration Changes":
+        return "Registration Changes";
       default:
         return "EEC Information Session Management – Administrator";
     }
@@ -490,14 +640,20 @@ export default function EecPage() {
               <StatsCards stats={stats} />
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
                 <div className="xl:col-span-2">
-                  <TrendChart trend={trend} maxTrend={maxTrend} />
+                  <TrendChart
+                    trend={trend}
+                    maxTrend={maxTrend}
+                    dateRange={dateRange}
+                    onDateRangeChange={setDateRange}
+                    periodLabel={trendPeriodLabel}
+                  />
                 </div>
                 <RegionalCompletionPanel regionalRates={regionalRates} />
               </div>
               <div className="bg-white border border-zinc-200 rounded-lg p-4">
                 <p className="text-sm font-semibold text-zinc-800 mb-2">Quick links</p>
                 <p className="text-sm text-zinc-600">
-                  Use the sidebar to drill into registration records, regional trends, agency compliance, and audit activity.
+                  Use the sidebar to drill into registration and attendance records, trends by region and CCRR and changes in registration activity.
                 </p>
               </div>
             </>
@@ -536,6 +692,46 @@ export default function EecPage() {
                     </select>
                   </div>
                 ))}
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-zinc-400">Attendance Status</span>
+                  <details className="relative min-w-[160px]">
+                    <summary className="flex cursor-pointer list-none items-center justify-between rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-700 focus:outline-none focus:ring-1 focus:ring-[#1a2f5e] [&::-webkit-details-marker]:hidden">
+                      <span>
+                        {attendanceStatuses.length === 0
+                          ? "All statuses"
+                          : attendanceStatuses.length === 1
+                            ? attendanceStatuses[0]
+                            : `${attendanceStatuses.length} statuses selected`}
+                      </span>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        className="ml-3 h-4 w-4 fill-zinc-500"
+                      >
+                        <path d="m5.25 7.5 4.75 4.75 4.75-4.75" />
+                      </svg>
+                    </summary>
+                    <div className="absolute left-0 z-10 mt-1 w-48 rounded-md border border-zinc-200 bg-white p-2 shadow-lg">
+                      {ATTENDANCE_STATUSES.map((status) => (
+                        <label key={status} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs text-zinc-700 hover:bg-zinc-50">
+                          <input
+                            type="checkbox"
+                            checked={attendanceStatuses.includes(status)}
+                            onChange={() =>
+                              setAttendanceStatuses((current) =>
+                                current.includes(status)
+                                  ? current.filter((item) => item !== status)
+                                  : [...current, status],
+                              )
+                            }
+                            className="h-3.5 w-3.5 rounded border-zinc-300 text-[#1a2f5e] focus:ring-[#1a2f5e]"
+                          />
+                          {status}
+                        </label>
+                      ))}
+                    </div>
+                  </details>
+                </div>
               </div>
 
               <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
@@ -616,7 +812,7 @@ export default function EecPage() {
                   <p className="text-xs text-zinc-400">
                     Showing {filteredRegistrations.length} registration{filteredRegistrations.length === 1 ? "" : "s"}
                     {searchQuery.trim() ? " (search)" : ""}
-                    {agency !== "All Agencies" || region !== "All Regions" || dateRange !== "Last 30 Days" || providerType !== "All Types" || language !== "All Languages"
+                    {agency !== "All Agencies" || region !== "All Regions" || dateRange !== "Last 30 Days" || providerType !== "All Types" || language !== "All Languages" || attendanceStatuses.length > 0
                       ? " (filtered)"
                       : ""}
                   </p>
@@ -625,20 +821,17 @@ export default function EecPage() {
             </>
           )}
 
-          {activeNav === "Agency Compliance" && (
+          {activeNav === "CCRR Statistics" && (
             <>
-              <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-zinc-700">
-                Agency-level reporting for federal compliance. Completion rates reflect attended registrations across published sessions.
-              </div>
               <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-zinc-100">
-                  <p className="text-sm font-semibold text-zinc-800">CCRR Agency Summary</p>
+                  <p className="text-sm font-semibold text-zinc-800">CCRR Statistics</p>
                 </div>
                 <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-100 bg-zinc-50">
-                      {["Agency", "Region", "Sessions", "Registrations", "Completions", "Rate"].map((header) => (
+                      {["Agency", "Region", "Sessions", "Registrants", "Attendees", "Attendance Rate", "Average Attendees per Session", "Average Attendance Rate per Session"].map((header) => (
                         <th key={header} className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">
                           {header}
                         </th>
@@ -648,8 +841,8 @@ export default function EecPage() {
                   <tbody>
                     {agencyCompliance.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-zinc-400">
-                          No agency compliance data available.
+                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-zinc-400">
+                          No CCRR statistics data available.
                         </td>
                       </tr>
                     ) : (
@@ -671,6 +864,12 @@ export default function EecPage() {
                               {entry.completionRate}%
                             </span>
                           </td>
+                          <td className="px-4 py-3 text-zinc-600">
+                            {entry.averageAttendeesPerSession.toFixed(1)}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-600">
+                            {entry.averageAttendanceRatePerSession}%
+                          </td>
                         </tr>
                       ))
                     )}
@@ -681,12 +880,14 @@ export default function EecPage() {
             </>
           )}
 
-          {activeNav === "Audit Logs" && (
+          {activeNav === "Registration Changes" && (
             <>
               <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-zinc-100">
-                  <p className="text-sm font-semibold text-zinc-800">Recent Activity</p>
-                  <p className="text-xs text-zinc-400 mt-0.5">Registration and attendance changes across all agencies</p>
+                  <p className="text-sm font-semibold text-zinc-800">Registration Changes</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    See any changes providers have made to their registrations, including cancellations and date changes.
+                  </p>
                 </div>
                 <div className="overflow-x-auto">
                 <table className="w-full text-sm">

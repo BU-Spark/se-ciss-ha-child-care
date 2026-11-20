@@ -10,7 +10,7 @@ import { rosterRegistrationStatusFilter } from "@/lib/registration-status";
 function formatAttendance(status: string) {
   if (status === "ATTENDED") return "Attended";
   if (status === "NO_SHOW") return "No-show";
-  return "Not marked";
+  return "Registered";
 }
 
 export async function GET() {

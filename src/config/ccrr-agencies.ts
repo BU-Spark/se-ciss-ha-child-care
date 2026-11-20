@@ -10,6 +10,7 @@ export type CcrrAgencyResource = {
   state: string;
   zip: string;
   region: string;
+  additionalRegions?: string[];
   phone: string;
   website: string;
   /** When paperwork PDFs are available under /public/resources/ */
@@ -97,6 +98,7 @@ export const OFFICIAL_CCRR_AGENCIES: CcrrAgencyResource[] = [
     state: "MA",
     zip: "01606",
     region: "Central",
+    additionalRegions: ["Western"],
     phone: "508-856-7930",
     website: "https://www.sevenhills.org",
     paperwork: {

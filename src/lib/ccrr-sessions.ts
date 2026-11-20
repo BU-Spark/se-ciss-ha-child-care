@@ -10,6 +10,7 @@ export const createSessionSchema = z
   .object({
     title: z.string().trim().min(1).max(200).default(DEFAULT_SESSION_TITLE),
     description: z.string().trim().max(2000).optional(),
+    region: z.string().trim().min(1).max(100).optional(),
     startsAt: z.string().min(1),
     endsAt: z.string().min(1),
     language: z.string().min(2).max(10),

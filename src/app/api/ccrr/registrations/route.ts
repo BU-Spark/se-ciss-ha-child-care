@@ -24,10 +24,6 @@ function formatAttendanceLabel(
     return "Waitlisted";
   }
 
-  if (attendanceStatus === "NOT_MARKED") {
-    return "Not marked";
-  }
-
   return "Registered";
 }
 

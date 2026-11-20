@@ -12,6 +12,7 @@ import {
 import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 type CreateSessionModalProps = {
+  regions: string[];
   onClose: () => void;
   onSuccess: () => void;
 };
@@ -21,6 +22,7 @@ function defaultStartDate() {
 }
 
 export function CreateSessionModal({
+  regions,
   onClose,
   onSuccess,
 }: CreateSessionModalProps) {
@@ -28,6 +30,7 @@ export function CreateSessionModal({
   const [form, setForm] = useState({
     title: DEFAULT_SESSION_TITLE,
     description: "",
+    region: regions[0] ?? "",
     date: defaultStartDate(),
     startTime: "10:00",
     endTime: "12:00",
@@ -103,6 +106,7 @@ export function CreateSessionModal({
         body: JSON.stringify({
           title: form.title.trim(),
           description: form.description.trim() || undefined,
+          region: form.region || undefined,
           startsAt: startsAtIso,
           endsAt: endsAtIso,
           language: form.language,
@@ -178,6 +182,27 @@ export function CreateSessionModal({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {regions.length > 1 && (
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`${formId}-region`}
+                className="text-xs font-medium text-zinc-600"
+              >
+                Session region
+              </label>
+              <select
+                id={`${formId}-region`}
+                name="region"
+                value={form.region}
+                onChange={handleChange}
+                className={fieldClass}
+              >
+                {regions.map((region) => (
+                  <option key={region} value={region}>{region}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <label
               htmlFor={`${formId}-date`}
